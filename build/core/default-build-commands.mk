@@ -15,6 +15,11 @@ TARGET_NO_UNDEFINED_LDFLAGS := -Wl,--no-undefined
 TARGET_NO_EXECUTE_CFLAGS  := -Wa,--noexecstack
 TARGET_NO_EXECUTE_LDFLAGS := -Wl,-z,noexecstack
 
+# Should replace cp with $(BITCODE_LD) but will cause seg fault
+define cmd-build-bitcode
+cp $(call host-path,$(PRIVATE_OBJECTS)) $(call host-path,$@)
+endef
+
 # NOTE: Ensure that TARGET_LIBGCC is placed after all private objects
 #       and static libraries, but before any other library in the link
 #       command line when generating shared libraries and executables.
@@ -74,7 +79,7 @@ endef
 cmd-strip = $(TOOLCHAIN_PREFIX)strip --strip-unneeded $(call host-path,$1)
 
 TARGET_LIBGCC = $(shell $(TARGET_CC) -print-libgcc-file-name)
-TARGET_LDLIBS := -Wl,-rpath-link=$(call host-path,$(SYSROOT)/usr/lib)
+TARGET_LDLIBS := -lc -lm
 
 #
 # IMPORTANT: The following definitions must use lazy assignment because
@@ -93,3 +98,10 @@ TARGET_LDFLAGS :=
 
 TARGET_AR       = $(TOOLCHAIN_PREFIX)ar
 TARGET_ARFLAGS := crs
+
+BITCODE_CC      = $(BITCODE_TOOLCHAIN_PREFIX)cc
+# clang need more arguments. remove when using llvm-ndk-cc
+BITCODE_CFLAGS  = -c -emit-llvm
+
+BITCODE_LD      = $(BITCODE_TOOLCHAIN_PREFIX)link
+BITCODE_LDFLAGS =

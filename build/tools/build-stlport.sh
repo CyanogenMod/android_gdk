@@ -31,8 +31,10 @@ PROGRAM_DESCRIPTION=\
 "Rebuild the prebuilt STLport binaries for the Android NDK.
 
 This script is called when packaging a new NDK release. It will simply
-rebuild the STLport static and shared libraries from sources by using
-the dummy project under $PROJECT_SUBDIR and a valid NDK installation.
+rebuild the STLport static and shared libraries from sources.
+
+This requires a temporary NDK installation containing platforms and
+toolchain binaries for all target architectures.
 
 By default, this will try with the current NDK directory, unless
 you use the --ndk-dir=<path> option.
@@ -42,15 +44,11 @@ The output will be placed in appropriate sub-directories of
 option.
 "
 
-RELEASE=`date +%Y%m%d`
-PACKAGE_DIR=/tmp/ndk-prebuilt/prebuilt-$RELEASE
+PACKAGE_DIR=
 register_var_option "--package-dir=<path>" PACKAGE_DIR "Put prebuilt tarballs into <path>."
 
 NDK_DIR=
-register_var_option "--ndk-dir=<path>" NDK_DIR "Don't package, put the files in target NDK dir."
-
-TOOLCHAIN_PKG=
-register_var_option "--toolchain-pkg=<path>" TOOLCHAIN_PKG "Use specific toolchain prebuilt package."
+register_var_option "--ndk-dir=<path>" NDK_DIR "Specify NDK root path for the build."
 
 BUILD_DIR=
 OPTION_BUILD_DIR=
@@ -62,125 +60,219 @@ register_var_option "--out-dir=<path>" OUT_DIR "Specify output directory directl
 ABIS="$STLPORT_ABIS"
 register_var_option "--abis=<list>" ABIS "Specify list of target ABIs."
 
+JOBS="$BUILD_NUM_CPUS"
+register_var_option "-j<number>" JOBS "Use <number> build jobs in parallel"
+
+NO_MAKEFILE=
+register_var_option "--no-makefile" NO_MAKEFILE "Do not use makefile to speed-up build"
+
+NUM_JOBS=$BUILD_NUM_CPUS
+register_var_option "-j<number>" NUM_JOBS "Run <number> build jobs in parallel"
+
 extract_parameters "$@"
 
-if [ -n "$PACKAGE_DIR" -a -n "$NDK_DIR" ] ; then
-    echo "ERROR: You cannot use both --package-dir and --ndk-dir at the same time!"
-    exit 1
-fi
+ABIS=$(commas_to_spaces $ABIS)
 
-if [ -n "$TOOLCHAIN_PKG" ] ; then
-    if [ ! -f "$TOOLCHAIN_PKG" ] ; then
-        dump "ERROR: Your toolchain package does not exist: $TOOLCHAIN_PKG"
-        exit 1
-    fi
-    case "$TOOLCHAIN_PKG" in
-        *.tar.bz2)
-            ;;
-        *)
-            dump "ERROR: Toolchain package is not .tar.bz2 archive: $TOOLCHAIN_PKG"
-            exit 1
-    esac
-fi
-
+# Handle NDK_DIR
 if [ -z "$NDK_DIR" ] ; then
-    mkdir -p "$PACKAGE_DIR"
-    if [ $? != 0 ] ; then
-        echo "ERROR: Could not create directory: $PACKAGE_DIR"
-        exit 1
-    fi
-    NDK_DIR=/tmp/ndk-toolchain/ndk-prebuilt-$$
-    mkdir -p $NDK_DIR &&
-    dump "Copying NDK files to temporary dir: $NDK_DIR"
-    run cp -rf $ANDROID_NDK_ROOT/* $NDK_DIR/
-    if [ -n "$TOOLCHAIN_PKG" ] ; then
-        dump "Extracting prebuilt toolchain binaries."
-        unpack_archive "$TOOLCHAIN_PKG" "$NDK_DIR"
-    fi
+    NDK_DIR=$ANDROID_NDK_ROOT
+    log "Auto-config: --ndk-dir=$NDK_DIR"
 else
     if [ ! -d "$NDK_DIR" ] ; then
         echo "ERROR: NDK directory does not exists: $NDK_DIR"
         exit 1
     fi
-    PACKAGE_DIR=
 fi
 
-#
-# Setup our paths
-#
-log "Using NDK root: $NDK_DIR"
-
-BUILD_DIR="$OPTION_BUILD_DIR"
-if [ -n "$BUILD_DIR" ] ; then
-    log "Using temporary build dir: $BUILD_DIR"
-else
-    BUILD_DIR=`random_temp_directory`
-    log "Using random build dir: $BUILD_DIR"
+if [ -z "$BUILD_DIR" ]; then
+    BUILD_DIR=$NDK_TMPDIR/build-stlport
 fi
 mkdir -p "$BUILD_DIR"
+fail_panic "Could not create build directory: $BUILD_DIR"
 
-if [ -z "$OUT_DIR" ] ; then
-    OUT_DIR=$NDK_DIR/$STLPORT_SUBDIR
-    log "Using default output dir: $OUT_DIR"
+# Location of the STLPort source tree
+STLPORT_SRCDIR=$ANDROID_NDK_ROOT/$STLPORT_SUBDIR
+
+# Compiler flags we want to use
+STLPORT_CFLAGS="-DGNU_SOURCE -fPIC -O2 -I$STLPORT_SRCDIR/stlport -DANDROID -D__ANDROID__"
+STLPORT_CFLAGS=$STLPORT_CFLAGS" -I$ANDROID_NDK_ROOT/sources/cxx-stl/system/include"
+STLPORT_CXXFLAGS="-fuse-cxa-atexit -fno-exceptions -fno-rtti"
+
+# List of sources to compile
+STLPORT_SOURCES=\
+"src/dll_main.cpp \
+src/fstream.cpp \
+src/strstream.cpp \
+src/sstream.cpp \
+src/ios.cpp \
+src/stdio_streambuf.cpp \
+src/istream.cpp \
+src/ostream.cpp \
+src/iostream.cpp \
+src/codecvt.cpp \
+src/collate.cpp \
+src/ctype.cpp \
+src/monetary.cpp \
+src/num_get.cpp \
+src/num_put.cpp \
+src/num_get_float.cpp \
+src/num_put_float.cpp \
+src/numpunct.cpp \
+src/time_facets.cpp \
+src/messages.cpp \
+src/locale.cpp \
+src/locale_impl.cpp \
+src/locale_catalog.cpp \
+src/facets_byname.cpp \
+src/complex.cpp \
+src/complex_io.cpp \
+src/complex_trig.cpp \
+src/string.cpp \
+src/bitset.cpp \
+src/allocators.cpp \
+src/c_locale.c \
+src/cxa.c"
+
+# If the --no-makefile flag is not used, we're going to put all build
+# commands in a temporary Makefile that we will be able to invoke with
+# -j$NUM_JOBS to build stuff in parallel.
+#
+if [ -z "$NO_MAKEFILE" ]; then
+    TAB=$(echo " " | tr ' ' '\t')
+    MAKEFILE=$BUILD_DIR/Makefile
+    log "Creating temporary build Makefile: $MAKEFILE"
+    rm -f $MAKEFILE &&
+    echo "# Auto-generated by $0 - do not edit!" > $MAKEFILE
+    echo ".PHONY: all" >> $MAKEFILE
+    echo "all:" >> $MAKEFILE
 else
-    log "Using usr output dir: $OUT_DIR"
+    MAKEFILE=
 fi
 
-#
-# Now build the fake project
-#
-# NOTE: We take the build project from this NDK's tree, not from
-#        the alternative one specified with --ndk=<dir>
-#
-PROJECT_DIR="$ANDROID_NDK_ROOT/$PROJECT_SUBDIR"
-if [ ! -d $PROJECT_DIR ] ; then
-    dump "ERROR: Missing required project: $PROJECT_SUBDIR"
-    exit 1
-fi
+# Build stlport as a static library
+# $1: ABI name
+# $2: Build directory
+# $3: Output directory (optional)
 
-# cleanup required to avoid problems with stale dependency files
-rm -rf "$PROJECT_DIR/libs"
-rm -rf "$PROJECT_DIR/obj"
+make_command ()
+{
+    if [ -z "$MAKEFILE" ]; then
+        $@
+    else
+        echo "${TAB}@$@" >> $MAKEFILE
+    fi
+}
 
-LIBRARIES="libstlport_static.a libstlport_shared.so"
+make_log ()
+{
+    if [ "$VERBOSE" = "yes" ]; then
+        echo "${TAB}@echo $@" >> $MAKEFILE
+    fi
+}
+
+build_stlport_libs_for_abi ()
+{
+    local ARCH BINPREFIX SYSROOT
+    local ABI=$1
+    local BUILDDIR="$2"
+    local DSTDIR="$3"
+    local SRC OBJ OBJECTS CFLAGS CXXFLAGS
+
+    log "stlport_static $ABI"
+    mkdir -p "$BUILDDIR"
+
+    ARCH=$(convert_abi_to_arch $ABI)
+    BINPREFIX=$NDK_DIR/$(get_default_toolchain_binprefix_for_arch $ARCH)
+    SYSROOT=$NDK_DIR/$(get_default_platform_sysroot_for_arch $ARCH)
+
+    CFLAGS=$STLPORT_CFLAGS
+    CXXFLAGS=$STLPORT_CXXFLAGS
+    case $ABI in
+        armeabi)
+            CFLAGS=$CFLAGS" -mthumb"
+            ;;
+        armeabi-v7a)
+            CFLAGS=$CFLAGS" -march=armv7-a -mfloat-abi=softfp"
+            ;;
+    esac
+    # If the output directory is not specified, use default location
+    if [ -z "$DSTDIR" ]; then
+        DSTDIR=$NDK_DIR/$STLPORT_SUBDIR/libs/$ABI
+    fi
+    mkdir -p $DSTDIR
+    OBJECTS=
+    for SRC in $STLPORT_SOURCES; do
+        OBJ=$(basename "$SRC")
+        OBJ=${OBJ%%.cpp}
+        OBJ=${OBJ%%.c}
+        OBJ="$BUILDDIR/$OBJ.o"
+        if [ "$MAKEFILE" ]; then
+            echo "$OBJ: $STLPORT_SRCDIR/$SRC" >> $MAKEFILE
+            make_log "$ABI C++: $SRC"
+        else
+            log "$ABI C++: $SRC"
+        fi
+        make_command ${BINPREFIX}g++ -c -o "$OBJ" "$STLPORT_SRCDIR/$SRC" $CFLAGS --sysroot="$SYSROOT" $CXXFLAGS
+        fail_panic "Could not compile $SRC"
+        OBJECTS=$OBJECTS" $OBJ"
+    done
+
+    if [ "$MAKEFILE" ]; then
+        echo "all: $DSTDIR/libstlport_static.a" >> $MAKEFILE
+        echo "$DSTDIR/libstlport_static.a: $OBJECTS" >> $MAKEFILE
+        make_log "$ABI Archive: stlport_static"
+    else
+        log "$ABI Archive: stlport_static"
+    fi
+    make_command ${BINPREFIX}ar crs "$DSTDIR/libstlport_static.a" $OBJECTS
+    fail_panic "Could not archive $ABI stlport_static objects!"
+
+    if [ "$MAKEFILE" ]; then
+        echo "all: $DSTDIR/libstlport_shared.so" >> $MAKEFILE
+        echo "$DSTDIR/libstlport_shared.so: $OBJECTS" >> $MAKEFILE
+        make_log "$ABI SharedLibrary: stlport_shared"
+    else
+        log "$ABI SharedLibrary: stlport_shared"
+    fi
+    make_command ${BINPREFIX}g++ \
+        -nostdlib -Wl,-soname,libstlport_shared.so \
+        -Wl,-shared,-Bsymbolic \
+        --sysroot="$SYSROOT" \
+        $CRTBEGIN_SO_O \
+        $OBJECTS \
+        -lgcc \
+        -lc -lm \
+        $CRTEND_SO_O \
+        -o $DSTDIR/libstlport_shared.so
+    fail_panic "Could not create $ABI shared library libstlport_shared!"
+}
+
 
 for ABI in $ABIS; do
-    dump "Building $ABI STLport binaries..."
-    (run cd "$PROJECT_SUBDIR" && run "$NDK_DIR"/ndk-build -B APP_ABI=$ABI -j$BUILD_JOBS STLPORT_FORCE_REBUILD=true)
-    if [ $? != 0 ] ; then
-        dump "ERROR: Could not build $ABI STLport binaries!!"
-        exit 1
-    fi
-
-    if [ -z "$PACKAGE_DIR" ] ; then
-       # Copy files to target NDK
-        SRCDIR="$PROJECT_SUBDIR/obj/local/$ABI"
-        DSTDIR="$OUT_DIR/libs/$ABI"
-        copy_file_list "$SRCDIR" "$DSTDIR" "$LIBRARIES"
-    fi
+    build_stlport_libs_for_abi $ABI "$BUILD_DIR/$ABI"
 done
+
+if [ "$MAKEFILE" ]; then
+    make -j$NUM_JOBS -f $MAKEFILE
+    fail_panic "Could not build STLport libraries!"
+fi
 
 # If needed, package files into tarballs
 if [ -n "$PACKAGE_DIR" ] ; then
     for ABI in $ABIS; do
         FILES=""
-        for LIB in $LIBRARIES; do
-            SRCDIR="$PROJECT_SUBDIR/obj/local/$ABI"
-            DSTDIR="$STLPORT_SUBDIR/libs/$ABI"
-            copy_file_list "$SRCDIR" "$NDK_DIR/$DSTDIR" "$LIB"
-            log "Installing: $DSTDIR/$LIB"
-            FILES="$FILES $DSTDIR/$LIB"
+        for LIB in libstlport_static.a libstlport_shared.so; do
+            FILES="$FILES $NDK_DIR/$STLPORT_SUBDIR/libs/$ABI/$LIB"
         done
         PACKAGE="$PACKAGE_DIR/stlport-libs-$ABI.tar.bz2"
-        pack_archive "$PACKAGE" "$NDK_DIR" "$FILES"
+        log "Packaging: $PACKAGE"
+        pack_archive "$PACKAGE" "$BUILD_DIR" "$FILES"
         fail_panic "Could not package $ABI STLport binaries!"
         dump "Packaging: $PACKAGE"
     done
 fi
 
-if [ -n "$PACKAGE_DIR" ] ; then
-    dump "Cleaning up..."
-    rm -rf $NDK_DIR
-fi
+log "Cleaning up..."
+rm -rf $BUILD_DIR
 
-dump "Done!"
+log "Done!"

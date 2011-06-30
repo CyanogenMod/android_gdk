@@ -27,7 +27,7 @@ NDK_LOG := $(strip $(NDK_LOG))
 #
 MAKE_TEST := $(lastword a b c d e f)
 ifneq ($(MAKE_TEST),f)
-    $(error Android NDK: GNU Make version $(MAKE_VERSION) is too low (should be >= 3.81)
+    $(error Android NDK: GNU Make version $(MAKE_VERSION) is too low (should be >= 3.81))
 endif
 ifdef NDK_LOG
     $(info Android NDK: GNU Make version $(MAKE_VERSION) detected)
@@ -266,7 +266,7 @@ include $(BUILD_SYSTEM)/definitions.mk
 # in build/toolchains/<name>/ that will be included here.
 #
 # Each one of these files should define the following variables:
-#   TOOLCHAIN_NAME   toolchain name (e.g. arm-eabi-4.2.1)
+#   TOOLCHAIN_NAME   toolchain name (e.g. arm-linux-androideabi-4.4.3)
 #   TOOLCHAIN_ABIS   list of target ABIs supported by the toolchain.
 #
 # Then, it should include $(ADD_TOOLCHAIN) which will perform
@@ -286,15 +286,12 @@ $(foreach _config_mk,$(TOOLCHAIN_CONFIGS),\
   $(eval include $(BUILD_SYSTEM)/add-toolchain.mk)\
 )
 
-NDK_ALL_TOOLCHAINS   := $(call uniq,$(NDK_ALL_TOOLCHAINS))
-NDK_ALL_ABIS         := $(call uniq,$(NDK_ALL_ABIS))
+NDK_ALL_TOOLCHAINS   := $(call remove-duplicates,$(NDK_ALL_TOOLCHAINS))
+NDK_ALL_ABIS         := $(call remove-duplicates,$(NDK_ALL_ABIS))
 
-# The default toolchain is now arm-eabi-4.4.0, however its
-# C++ compiler is a tad bit more pedantic with certain
-# constructs (e.g. templates) so allow users to switch back
-# to the old 4.2.1 instead if they really want to.
-#
-# NOTE: you won't get armeabi-v7a support though !
+# Allow the user to define NDK_TOOLCHAIN to a custom toolchain name.
+# This is normally used when the NDK release comes with several toolchains
+# for the same architecture (generally for backwards-compatibility).
 #
 NDK_TOOLCHAIN := $(strip $(NDK_TOOLCHAIN))
 ifdef NDK_TOOLCHAIN
@@ -346,12 +343,11 @@ ifndef NDK_PLATFORMS_ROOT
     endif
 
     $(call ndk_log,Found platform root directory: $(NDK_PLATFORMS_ROOT))
-else
-    ifeq ($(strip $(wildcard $(NDK_PLATFORMS_ROOT)/android-*)),)
-        $(call __ndk_info,Your NDK_PLATFORMS_ROOT points to an invalid directory)
-        $(call __ndk_info,Current value: $(NDK_PLATFORMS_ROOT))
-        $(call __ndk_error,Aborting)
-    endif
+endif
+ifeq ($(strip $(wildcard $(NDK_PLATFORMS_ROOT)/android-*)),)
+    $(call __ndk_info,Your NDK_PLATFORMS_ROOT points to an invalid directory)
+    $(call __ndk_info,Current value: $(NDK_PLATFORMS_ROOT))
+    $(call __ndk_error,Aborting)
 endif
 
 NDK_ALL_PLATFORMS := $(strip $(notdir $(wildcard $(NDK_PLATFORMS_ROOT)/android-*)))

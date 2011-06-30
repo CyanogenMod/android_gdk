@@ -33,6 +33,82 @@ underscores_to_dashes ()
     echo $@ | tr '_' '-'
 }
 
+# Translate commas to spaces
+# Usage: str=`commas_to_spaces <list>`
+commas_to_spaces ()
+{
+    echo $@ | tr ',' ' '
+}
+
+# Translate spaces to commas
+# Usage: list=`spaces_to_commas <string>`
+spaces_to_commas ()
+{
+    echo $@ | tr ' ' ','
+}
+
+# Remove trailing path of a path
+# $1: path
+remove_trailing_slash () {
+    echo ${1%%/}
+}
+
+# Reverse a file path directory
+# foo -> .
+# foo/bar -> ..
+# foo/bar/zoo -> ../..
+reverse_path ()
+{
+    local path cur item
+    path=`remove_trailing_slash $1`
+    cur="."
+    if [ "$path" != "." ] ; then
+        for item in `echo "$path" | tr '/' ' '`; do
+            cur="../$cur"
+        done
+    fi
+    echo `echo $cur | sed -e 's!/.$!!g'`
+}
+
+# test_reverse_path ()
+# {
+#     rr=`reverse_path $1`
+#     if [ "$rr" != "$2" ] ; then
+#         echo "ERROR: reverse_path '$1' -> '$rr' (expected '$2')"
+#     fi
+# }
+#
+# test_reverse_path . .
+# test_reverse_path ./ .
+# test_reverse_path foo ..
+# test_reverse_path foo/ ..
+# test_reverse_path foo/bar ../..
+# test_reverse_path foo/bar/ ../..
+# test_reverse_path foo/bar/zoo ../../..
+# test_reverse_path foo/bar/zoo/ ../../..
+
+# Sort a space-separated list and remove duplicates
+# $1+: slist
+# Output: new slist
+sort_uniq ()
+{
+    local RET
+    RET=$(echo $@ | tr ' ' '\n' | sort -u)
+    echo $RET
+}
+
+# Return the list of all regular files under a given directory
+# $1: Directory path
+# Output: list of files, relative to $1
+list_files_under ()
+{
+    if [ -d "$1" ]; then
+        (cd $1 && find . -type f | sed -e "s!./!!" | sort -u)
+    else
+        echo ""
+    fi
+}
+
 #====================================================
 #
 #  OPTION PROCESSING
@@ -176,6 +252,14 @@ register_mingw_option ()
     if [ "$HOST_OS" = "linux" ] ; then
         register_option "--mingw" do_mingw_option "Generate windows binaries on Linux."
     fi
+}
+
+TRY64=no
+do_try64_option () { TRY64=yes; }
+
+register_try64_option ()
+{
+    register_option "--try-64" do_try64_option "Generate 64-bit binaries."
 }
 
 # Print the help, including a list of registered options for this program
@@ -464,9 +548,9 @@ prepare_host_flags ()
     # binaries.
     #
     # We only do this if the CC variable is not defined to a given value
-    # and the --mingw option is not used.
+    # and the --mingw or --try-64 options are not used.
     #
-    if [ "$HOST_OS" = "linux" -a -z "$CC" -a "$MINGW" != "yes" ]; then
+    if [ "$HOST_OS" = "linux" -a -z "$CC" -a "$MINGW" != "yes" -a "$TRY64" != "yes" ]; then
         LEGACY_TOOLCHAIN_DIR="$ANDROID_NDK_ROOT/../prebuilt/linux-x86/toolchain/i686-linux-glibc2.7-4.4.3"
         if [ -d "$LEGACY_TOOLCHAIN_DIR" ] ; then
             dump "Forcing generation of Linux binaries with legacy toolchain"
@@ -509,22 +593,29 @@ prepare_host_flags ()
     int test_array[1-2*(sizeof(void*) != 4)];
 EOF
     echo -n "Checking whether the compiler generates 32-bit binaries..."
+    HOST_GMP_ABI=32
     log $CC $HOST_CFLAGS -c -o $TMPO $TMPC
     $CC $HOST_CFLAGS -c -o $TMPO $TMPC >$TMPL 2>&1
     if [ $? != 0 ] ; then
         echo "no"
-        # NOTE: We need to modify the definitions of CC and CXX directly
-        #        here. Just changing the value of CFLAGS / HOST_CFLAGS
-        #        will not work well with the GCC toolchain scripts.
-        CC="$CC -m32"
-        CXX="$CXX -m32"
+        if [ "$TRY64" != "yes" ]; then
+            # NOTE: We need to modify the definitions of CC and CXX directly
+            #        here. Just changing the value of CFLAGS / HOST_CFLAGS
+            #        will not work well with the GCC toolchain scripts.
+            CC="$CC -m32"
+            CXX="$CXX -m32"
+        else
+            HOST_GMP_ABI=64
+        fi
     else
         echo "yes"
     fi
 
     # For now, we only support building 32-bit binaries anyway
-    force_32bit_binaries  # to modify HOST_TAG and others
-    HOST_GMP_ABI="32"
+    if [ "$TRY64" != "yes" ]; then
+        force_32bit_binaries  # to modify HOST_TAG and others
+        HOST_GMP_ABI="32"
+    fi
 
     # Now handle the --mingw flag
     if [ "$MINGW" = "yes" ] ; then
@@ -536,7 +627,11 @@ EOF
                 exit 1
                 ;;
         esac
-        ABI_CONFIGURE_HOST=i586-mingw32msvc
+        if [ "$TRY64" = "yes" ]; then
+            ABI_CONFIGURE_HOST=amd64-mingw32msvc
+        else
+            ABI_CONFIGURE_HOST=i586-mingw32msvc
+        fi
         HOST_OS=windows
         HOST_TAG=windows
         HOST_EXE=.exe
@@ -560,15 +655,10 @@ parse_toolchain_name ()
     # Determine ABI based on toolchain name
     #
     case "$TOOLCHAIN" in
-    arm-eabi-*)
-        ARCH="arm"
-        ABI_CONFIGURE_TARGET="arm-eabi"
-        ;;
     arm-linux-androideabi-*)
         ARCH="arm"
         ABI_CONFIGURE_TARGET="arm-linux-androideabi"
-        ABI_CONFIGURE_EXTRA_FLAGS="--with-gmp-version=4.2.4 --with-mpfr-version=2.4.1
---with-arch=armv5te"
+        ABI_CONFIGURE_EXTRA_FLAGS="--with-arch=armv5te"
         # Disable ARM Gold linker for now, it doesn't build on Windows, it
         # crashes with SIGBUS on Darwin, and produces weird executables on
         # linux that strip complains about... Sigh.
@@ -585,11 +675,15 @@ parse_toolchain_name ()
     x86-*)
         ARCH="x86"
         ABI_INSTALL_NAME="x86"
-        ABI_CONFIGURE_TARGET="i686-android-linux-gnu"
-        PLATFORM=android-5
+        ABI_CONFIGURE_TARGET="i686-android-linux"
+        # Enable C++ exceptions, RTTI and GNU libstdc++ at the same time
+        # You can't really build these separately at the moment.
+        ABI_CFLAGS_FOR_TARGET="-fexceptions -fPIC"
+        ABI_CXXFLAGS_FOR_TARGET="-frtti"
+        ABI_CONFIGURE_EXTRA_FLAGS="$ABI_CONFIGURE_EXTRA_FLAGS --enable-libstdc__-v3"
         ;;
     * )
-        echo "Invalid toolchain specified. Expected (arm-eabi-*|x86-*)"
+        echo "Invalid toolchain specified. Expected (arm-linux-androideabi-*|x86-*)"
         echo ""
         print_help
         exit 1
@@ -598,7 +692,7 @@ parse_toolchain_name ()
 
     log "Targetting CPU: $ARCH"
 
-    GCC_VERSION=`expr -- "$TOOLCHAIN" : '.*-\([0-9\.]*\)'`
+    GCC_VERSION=`expr -- "$TOOLCHAIN" : '.*-\([0-9x\.]*\)'`
     log "Using GCC version: $GCC_VERSION"
 
     # Determine --host value when building gdbserver
@@ -615,23 +709,143 @@ parse_toolchain_name ()
 
 }
 
+
+get_prebuilt_host_tag ()
+{
+    local RET=$HOST_TAG
+    case $RET in
+        linux-x86_64)
+            if [ "$TRY64" = "no" ]; then
+                RET=linux-x86
+            fi
+            ;;
+        darwin_x86_64)
+            if [ "$TRY64" = "no" ]; then
+                RET=darwin-x86
+            fi
+            ;;
+    esac
+    echo $RET
+}
+
+# Convert an ABI name into an Architecture name
+# $1: ABI name
+# Result: Arch name
+convert_abi_to_arch ()
+{
+    local RET
+    case $1 in
+        armeabi|armeabi-v7a)
+            RET=arm
+            ;;
+        x86)
+            RET=x86
+            ;;
+        *)
+            2> echo "ERROR: Unsupported ABI name: $1, use one of: armeabi, armeabi-v7a or x86"
+            exit 1
+            ;;
+    esac
+    echo "$RET"
+}
+
+# Retrieve the list of default ABIs supported by a given architecture
+# $1: Architecture name
+# Result: space-separated list of ABI names
+get_default_abis_for_arch ()
+{
+    local RET
+    case $1 in
+        arm)
+            RET="armeabi armeabi-v7a"
+            ;;
+        x86)
+            RET="x86"
+            ;;
+        *)
+            2> echo "ERROR: Unsupported architecture name: $1, use one of: arm x86"
+            exit 1
+            ;;
+    esac
+    echo "$RET"
+}
+
+# Return the default name for a given architecture
+# $1: Architecture name
+get_default_toolchain_name_for ()
+{
+    eval echo "\$DEFAULT_ARCH_TOOLCHAIN_$1"
+}
+
+# Return the default toolchain program prefix for a given architecture
+# $1: Architecture name
+get_default_toolchain_prefix_for ()
+{
+    eval echo "\$DEFAULT_ARCH_TOOLCHAIN_PREFIX_$1"
+}
+
+# Return the default binary path prefix for a given architecture
+# For example: arm -> toolchains/arm-linux-androideabi-4.4.3/prebuilt/<system>/bin/arm-linux-androideabi-
+# $1: Architecture name
+get_default_toolchain_binprefix_for_arch ()
+{
+    local NAME PREFIX DIR BINPREFIX
+    NAME=$(get_default_toolchain_name_for $1)
+    PREFIX=$(get_default_toolchain_prefix_for $1)
+    DIR=$(get_toolchain_install . $NAME)
+    BINPREFIX=${DIR#./}/bin/$PREFIX
+    echo "$BINPREFIX"
+}
+
+# Return default API level for a given arch
+# This is the level used to build the toolchains.
+#
+# $1: Architecture name
+get_default_api_level_for_arch ()
+{
+    # For now, always build the toolchain against API level 9
+    # (We have local toolchain patches under build/tools/toolchain-patches
+    # to ensure that the result works on previous platforms properly).
+    local LEVEL=9
+    echo $LEVEL
+}
+
+# Return the default platform sysroot corresponding to a given architecture
+# This is the sysroot used to build the toolchain and other binaries like
+# the STLport libraries.
+# $1: Architecture name
+get_default_platform_sysroot_for_arch ()
+{
+    local LEVEL=$(get_default_api_level_for_arch $1)
+    echo "platforms/android-$LEVEL/arch-$1"
+}
+
+# Guess what?
+get_default_platform_sysroot_for_abi ()
+{
+    local ARCH=$(convert_abi_to_arch $1)
+    $(get_default_platform_sysroot_for_arch $ARCH)
+}
+
 # Return the host/build specific path for prebuilt toolchain binaries
 # relative to $1.
 #
 # $1: target root NDK directory
+# $2: toolchain name
 #
 get_toolchain_install ()
 {
-    echo "$1/toolchains/$TOOLCHAIN/prebuilt/$HOST_TAG"
+    echo "$1/toolchains/$2/prebuilt/$(get_prebuilt_host_tag)"
 }
 
 
 # Set the toolchain target NDK location.
 # this sets TOOLCHAIN_PATH and TOOLCHAIN_PREFIX
 # $1: target NDK path
+# $2: toolchain name
 set_toolchain_ndk ()
 {
-    TOOLCHAIN_PATH=`get_toolchain_install $1`
+    TOOLCHAIN_PATH=`get_toolchain_install "$1" $2`
     log "Using toolchain path: $TOOLCHAIN_PATH"
 
     TOOLCHAIN_PREFIX=$TOOLCHAIN_PATH/bin/$ABI_CONFIGURE_TARGET
@@ -641,25 +855,36 @@ set_toolchain_ndk ()
 # Check that a toolchain is properly installed at a target NDK location
 #
 # $1: target root NDK directory
+# $2: toolchain name
 #
 check_toolchain_install ()
 {
-    TOOLCHAIN_PATH=`get_toolchain_install $1`
+    TOOLCHAIN_PATH=`get_toolchain_install "$1" $2`
     if [ ! -d "$TOOLCHAIN_PATH" ] ; then
-        echo "ERROR: Toolchain '$TOOLCHAIN' not installed in '$NDK_DIR'!"
+        echo "ERROR: Toolchain '$2' not installed in '$NDK_DIR'!"
         echo "       Ensure that the toolchain has been installed there before."
         exit 1
     fi
 
-    set_toolchain_ndk $1
+    set_toolchain_ndk $1 $2
 }
 
 
-random_temp_directory ()
-{
-    mkdir -p /tmp/ndk-toolchain
-    mktemp -d /tmp/ndk-toolchain/build-XXXXXX
-}
+#
+# The NDK_TMPDIR variable is used to specify a root temporary directory
+# when invoking toolchain build scripts. If it is not defined, we will
+# create one here, and export the value to ensure that any scripts we
+# call after that use the same one.
+#
+if [ -z "$NDK_TMPDIR" ]; then
+    NDK_TMPDIR=/tmp/ndk-$USER/tmp/build-$$
+    mkdir -p $NDK_TMPDIR
+    if [ $? != 0 ]; then
+        echo "ERROR: Could not create NDK_TMPDIR: $NDK_TMPDIR"
+        exit 1
+    fi
+    export NDK_TMPDIR
+fi
 
 #
 # Common definitions
@@ -676,7 +901,7 @@ API_LEVELS="3 4 5 8 9"
 STLPORT_SUBDIR=sources/cxx-stl/stlport
 
 # Default ABIs for the prebuilt STLport binaries
-STLPORT_ABIS="armeabi armeabi-v7a"
+STLPORT_ABIS="armeabi armeabi-v7a x86"
 
 # Location of the GNU libstdc++ headers and libraries, relative to the NDK
 # root directory.
@@ -684,4 +909,15 @@ GNUSTL_SUBDIR=sources/cxx-stl/gnu-libstdc++
 
 # The date to use when downloading toolchain sources from android.git.kernel.org
 # Leave it empty for tip of tree.
-TOOLCHAIN_GIT_DATE=2010-12-13
+TOOLCHAIN_GIT_DATE=2011-02-23
+
+# Default toolchain names and prefix
+#
+# This is used by get_default_toolchain_name and get_default_toolchain_prefix
+# defined above
+DEFAULT_ARCH_TOOLCHAIN_arm=arm-linux-androideabi-4.4.3
+DEFAULT_ARCH_TOOLCHAIN_PREFIX_arm=arm-linux-androideabi-
+
+DEFAULT_ARCH_TOOLCHAIN_x86=x86-4.4.3
+DEFAULT_ARCH_TOOLCHAIN_PREFIX_x86=i686-android-linux-
+

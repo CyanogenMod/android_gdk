@@ -48,8 +48,14 @@ register_var_option "--git-http" OPTION_GIT_HTTP "Use http to download sources f
 OPTION_GIT_BASE=
 register_var_option "--git-base=<git-uri>" OPTION_GIT_BASE "Use specific git repository base"
 
+OPTION_GIT_REFERENCE=
+register_var_option "--git-reference=<path>" OPTION_GIT_REFERENCE "Use local git reference base"
+
 OPTION_PACKAGE=no
 register_var_option "--package" OPTION_PACKAGE "Create source package in /tmp"
+
+OPTION_NO_PATCHES=no
+register_var_option "--no-patches" OPTION_NO_PATCHES "Do not patch sources"
 
 PROGRAM_PARAMETERS="<src-dir>"
 PROGRAM_DESCRIPTION=\
@@ -66,7 +72,13 @@ correspond to the date of $TOOLCHAIN_GIT_DATE. If you want to use the tip of
 tree, use '--git-date=now' instead.
 
 If you don't want to use the official servers, use --git-base=<path> to
-download the sources from another set of git repostories."
+download the sources from another set of git repostories.
+
+You can also speed-up the download if you maintain a local copy of the
+toolchain repositories on your machine. Use --git-reference=<path> to
+specify the base path that contains all copies, and its subdirectories will
+be used as git clone shared references.
+"
 
 fi
 
@@ -117,15 +129,30 @@ else
 fi
 dump "Using git clone prefix: $GITPREFIX"
 
+GITREFERENCE=
+if [ -n "$OPTION_GIT_REFERENCE" ] ; then
+    GITREFERENCE=$OPTION_GIT_REFERENCE
+    if [ ! -d "$GITREFERENCE" -o ! -d "$GITREFERENCE/build" ]; then
+        echo "ERROR: Invalid reference repository directory path: $GITREFERENCE"
+        exit 1
+    fi
+    dump "Using git clone reference: $GITREFERENCE"
+fi
+
 toolchain_clone ()
 {
+    local GITFLAGS
+    GITFLAGS=
+    if [ "$GITREFERENCE" ]; then
+        GITFLAGS="$GITFLAGS --shared --reference $GITREFERENCE/$1"
+    fi
     dump "downloading sources for toolchain/$1"
     if [ -d "$GITPREFIX/$1" ]; then
         log "cloning $GITPREFIX/$1"
-        run git clone $GITPREFIX/$1 $1
+        run git clone $GITFLAGS $GITPREFIX/$1 $1
     else
         log "cloning $GITPREFIX/$1.git"
-        run git clone $GITPREFIX/$1.git $1
+        run git clone $GITFLAGS $GITPREFIX/$1.git $1
     fi
     fail_panic "Could not clone $GITPREFIX/$1.git ?"
     log "checking out $BRANCH branch of $1.git"
@@ -133,13 +160,13 @@ toolchain_clone ()
     if [ "$BRANCH" != "master" ] ; then
         run git checkout -b $BRANCH origin/$BRANCH
         fail_panic "Could not checkout $1 ?"
-        # If --git-date is used, or we have a default
-        if [ -n "$GIT_DATE" ] ; then
-            REVISION=`git rev-list -n 1 --until="$GIT_DATE" HEAD`
-            dump "Using sources for date '$GIT_DATE': toolchain/$1 revision $REVISION"
-            run git checkout $REVISION
-            fail_panic "Could not checkout $1 ?"
-        fi
+    fi
+    # If --git-date is used, or we have a default
+    if [ -n "$GIT_DATE" ] ; then
+        REVISION=`git rev-list -n 1 --until="$GIT_DATE" HEAD`
+        dump "Using sources for date '$GIT_DATE': toolchain/$1 revision $REVISION"
+        run git checkout $REVISION
+        fail_panic "Could not checkout $1 ?"
     fi
     # get rid of .git directory, we won't need it.
     cd ..
@@ -157,13 +184,15 @@ toolchain_clone gold  # not sure about this one !
 toolchain_clone mpfr
 
 # Patch the toolchain sources
-PATCHES_DIR="$PROGDIR/toolchain-patches"
-if [ -d "$PATCHES_DIR" ] ; then
-    dump "Patching toolchain sources"
-    run $PROGDIR/patch-sources.sh $FLAGS $TMPDIR $PATCHES_DIR
-    if [ $? != 0 ] ; then
-        dump "ERROR: Could not patch sources."
-        exit 1
+if [ "$OPTION_NO_PATCHES" != "yes" ]; then
+    PATCHES_DIR="$PROGDIR/toolchain-patches"
+    if [ -d "$PATCHES_DIR" ] ; then
+        dump "Patching toolchain sources"
+        run $PROGDIR/patch-sources.sh $FLAGS $TMPDIR $PATCHES_DIR
+        if [ $? != 0 ] ; then
+            dump "ERROR: Could not patch sources."
+            exit 1
+        fi
     fi
 fi
 
@@ -171,9 +200,10 @@ fi
 # We only keep one version of gcc and binutils
 
 # we clearly don't need this
-log "getting rid of obsolete sources: gcc-4.2.1 gcc-4.3.1 gdb-6.8 binutils-2.17"
+log "getting rid of obsolete sources: gcc-4.2.1 gcc-4.3.1 gcc-4.4.0 gdb-6.8 binutils-2.17"
 rm -rf $TMPDIR/gcc/gcc-4.2.1
 rm -rf $TMPDIR/gcc/gcc-4.3.1
+rm -rf $TMPDIR/gcc/gcc-4.4.0
 rm -rf $TMPDIR/gcc/gdb-6.8
 rm -rf $TMPDIR/binutils/binutils-2.17
 
@@ -182,7 +212,7 @@ rm -rf $TMPDIR/binutils/binutils-2.17
 # if you don't have exactly the configuration expected by
 # the scripts.
 #
-find $TMPDIR -type f -a -name "*.info" -print0 | xargs -0 rm -f
+find $TMPDIR -type f -a -name "*.info" ! -name sysroff.info -print0 | xargs -0 rm -f
 
 if [ $OPTION_PACKAGE = "yes" ] ; then
     # create the package

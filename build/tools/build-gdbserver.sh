@@ -28,7 +28,7 @@ PROGRAM_DESCRIPTION=\
 
 Where <src-dir> is the location of the gdbserver sources,
 <ndk-dir> is the top-level NDK installation path and <toolchain>
-is the name of the toolchain to use (e.g. arm-eabi-4.4.0).
+is the name of the toolchain to use (e.g. arm-linux-androideabi-4.4.3).
 
 The final binary is placed under:
 
@@ -39,11 +39,11 @@ NOTE: The --platform option is ignored if --sysroot is used."
 VERBOSE=no
 
 OPTION_BUILD_OUT=
-BUILD_OUT=`random_temp_directory`
-register_option "--build-out=<path>" do_build_out "Set temporary build directory" "/tmp/<random>"
+BUILD_OUT=/tmp/ndk-$USER/build/gdbserver
+register_option "--build-out=<path>" do_build_out "Set temporary build directory"
 do_build_out () { OPTION_BUILD_OUT="$1"; }
 
-PLATFORM=android-3
+PLATFORM=android-9
 register_var_option "--platform=<name>"  PLATFORM "Target specific platform"
 
 SYSROOT=
@@ -118,7 +118,7 @@ set_parameters $PARAMETERS
 prepare_host_flags
 
 parse_toolchain_name
-check_toolchain_install $NDK_DIR
+check_toolchain_install $NDK_DIR $TOOLCHAIN
 
 # Check build directory
 #
@@ -152,7 +152,8 @@ if [ "$NOTHREADS" != "yes" ] ; then
     # Small trick, to avoid calling ar, we store the single object file
     # with an .a suffix. The linker will handle that seamlessly.
     run cp $LIBTHREAD_DB_DIR/thread_db.h $BUILD_SYSROOT/usr/include/
-    run $TOOLCHAIN_PREFIX-gcc --sysroot=$BUILD_SYSROOT -o $BUILD_SYSROOT/usr/lib/libthread_db.a -c $LIBTHREAD_DB_DIR/libthread_db.c
+    run $TOOLCHAIN_PREFIX-gcc --sysroot=$BUILD_SYSROOT -o $BUILD_SYSROOT/usr/lib/libthread_db.o -c $LIBTHREAD_DB_DIR/libthread_db.c
+    run $TOOLCHAIN_PREFIX-ar -r $BUILD_SYSROOT/usr/lib/libthread_db.a $BUILD_SYSROOT/usr/lib/libthread_db.o
     if [ $? != 0 ] ; then
         dump "ERROR: Could not compile libthread_db.c!"
         exit 1

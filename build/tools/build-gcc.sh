@@ -28,12 +28,12 @@ PROGRAM_DESCRIPTION=\
 
 Where <src-dir> is the location of toolchain sources, <ndk-dir> is
 the top-level NDK installation path and <toolchain> is the name of
-the toolchain to use (e.g. arm-eabi-4.4.0)."
+the toolchain to use (e.g. arm-linux-androideabi-4.4.3)."
 
 RELEASE=`date +%Y%m%d`
-BUILD_OUT=`random_temp_directory`
+BUILD_OUT=/tmp/ndk-$USER/build/toolchain
 OPTION_BUILD_OUT=
-register_var_option "--build-out=<path>" OPTION_BUILD_OUT "Set temporary build directory" "/tmp/<random>"
+register_var_option "--build-out=<path>" OPTION_BUILD_OUT "Set temporary build directory"
 
 # Note: platform API level 9 or higher is needed for proper C++ support
 PLATFORM=android-9
@@ -48,6 +48,12 @@ register_var_option "--gdb-version=<version>"  GDB_VERSION "Specify gdb version"
 BINUTILS_VERSION=2.19
 register_var_option "--binutils-version=<version>" BINUTILS_VERSION "Specify binutils version"
 
+GMP_VERSION=4.2.4
+register_var_option "--gmp-version=<version>" GMP_VERSION "Specify gmp version"
+
+MPFR_VERSION=2.4.1
+register_var_option "--mpfr-version=<version>" MPFR_VERSION "Specify mpfr version"
+
 JOBS=$BUILD_NUM_CPUS
 register_var_option "-j<number>" JOBS "Use <number> parallel build jobs"
 
@@ -58,10 +64,12 @@ KEEP_LIBSTDCXX=no
 register_var_option "--keep-libstdcxx" KEEP_LIBSTDCXX "Experimental: keep libstdc++ inside toolchain"
 
 register_mingw_option
+register_try64_option
 
 extract_parameters "$@"
 
-setup_default_log_file
+fix_option BUILD_OUT "$OPTION_BUILD_OUT" "build directory"
+setup_default_log_file $BUILD_OUT/config.log
 
 set_parameters ()
 {
@@ -114,7 +122,6 @@ prepare_host_flags
 
 parse_toolchain_name
 
-fix_option BUILD_OUT "$OPTION_BUILD_OUT" "build directory"
 fix_sysroot "$OPTION_SYSROOT"
 
 if [ ! -d $SRC_DIR/gdb/gdb-$GDB_VERSION ] ; then
@@ -130,7 +137,14 @@ if [ ! -d $SRC_DIR/binutils/binutils-$BINUTILS_VERSION ] ; then
     exit 1
 fi
 
-set_toolchain_ndk $NDK_DIR
+fix_option MPFR_VERSION "$OPTION_MPFR_VERSION" "mpfr version"
+if [ ! -f $SRC_DIR/mpfr/mpfr-$MPFR_VERSION.tar.bz2 ] ; then
+    echo "ERROR: Missing mpfr sources: $SRC_DIR/mpfr/mpfr-$MPFR_VERSION.tar.bz2"
+    echo "       Use --mpfr-version=<version> to specify alternative."
+    exit 1
+fi
+
+set_toolchain_ndk $NDK_DIR $TOOLCHAIN
 
 dump "Using C compiler: $CC"
 dump "Using C++ compiler: $CXX"
@@ -146,6 +160,15 @@ mkdir -p $TOOLCHAIN_SYSROOT && (cd $SYSROOT && tar ch *) | (cd $TOOLCHAIN_SYSROO
 if [ $? != 0 ] ; then
     echo "Error while copying sysroot files. See $TMPLOG"
     exit 1
+fi
+
+# For x86, we currently need to force the usage of Android-specific C runtime
+# object files to generate a few target binaries. Ideally, this should be directly
+# handled by the GCC configuration scripts, just like with ARM.
+#
+if [ "$ARCH" = "x86" ]; then
+    ABI_LDFLAGS_FOR_TARGET=" -nostartfiles $TOOLCHAIN_SYSROOT/usr/lib/crtbegin_dynamic.o $TOOLCHAIN_SYSROOT/usr/lib/crtend_android.o"
+    dump "Forcing -nostartfiles: $ABI_LDFLAGS_FOR_TARGET"
 fi
 
 # configure the toolchain
@@ -164,6 +187,7 @@ OLD_ABI="${ABI}"
 export CC CXX
 export CFLAGS_FOR_TARGET="$ABI_CFLAGS_FOR_TARGET"
 export CXXFLAGS_FOR_TARGET="$ABI_CXXFLAGS_FOR_TARGET"
+export LDFLAGS_FOR_TARGET="$ABI_LDFLAGS_FOR_TARGET"
 # Needed to build a 32-bit gmp on 64-bit systems
 export ABI=$HOST_GMP_ABI
 # -Wno-error is needed because our gdb-6.6 sources use -Werror by default
@@ -172,12 +196,15 @@ export CFLAGS="-Wno-error"
 #export LDFLAGS="$HOST_LDFLAGS"
 mkdir -p $BUILD_OUT && cd $BUILD_OUT && run \
 $BUILD_SRCDIR/configure --target=$ABI_CONFIGURE_TARGET \
+                        --enable-initfini-array \
                         --host=$ABI_CONFIGURE_HOST \
                         --build=$ABI_CONFIGURE_BUILD \
                         --disable-nls \
                         --prefix=$TOOLCHAIN_PATH \
                         --with-sysroot=$TOOLCHAIN_SYSROOT \
                         --with-binutils-version=$BINUTILS_VERSION \
+                        --with-mpfr-version=$MPFR_VERSION \
+                        --with-gmp-version=$GMP_VERSION \
                         --with-gcc-version=$GCC_VERSION \
                         --with-gdb-version=$GDB_VERSION \
                         $ABI_CONFIGURE_EXTRA_FLAGS
@@ -235,7 +262,7 @@ run rm -rf $TOOLCHAIN_PATH/$ABI_CONFIGURE_TARGET/lib/*/libiberty.a
 
 # Copy libstdc++ headers and libraries if needed
 if [ "$COPY_LIBSTDCXX" = "yes" ] ; then
-    dump "Copying libstdc++ prebuild binaries."
+    dump "Copying libstdc++ prebuilt binaries."
     $ANDROID_NDK_ROOT/build/tools/copy-libstdcxx.sh "$TOOLCHAIN_PATH" "$NDK_DIR" --toolchain=$TOOLCHAIN
 fi
 

@@ -29,14 +29,14 @@ $(call assert-defined,NDK_APPS NDK_APP_OUT)
 
 # These phony targets are used to control various stages of the build
 .PHONY: all \
+	copy-llvm-toolchains \
         host_libraries host_executables \
         installed_modules \
         executables libraries static_libraries shared_libraries \
         clean clean-objs-dir \
         clean-executables clean-libraries \
         clean-installed-modules \
-        clean-installed-binaries \
-        copy-llvm-toolchains
+        clean-installed-binaries
 
 # These macros are used in Android.mk to include the corresponding
 # build script that will parse the LOCAL_XXX variable definitions.
@@ -47,9 +47,9 @@ BUILD_HOST_STATIC_LIBRARY := $(BUILD_SYSTEM)/build-host-static-library.mk
 BUILD_STATIC_LIBRARY      := $(BUILD_SYSTEM)/build-static-library.mk
 BUILD_SHARED_LIBRARY      := $(BUILD_SYSTEM)/build-shared-library.mk
 BUILD_EXECUTABLE          := $(BUILD_SYSTEM)/build-executable.mk
+BUILD_BITCODE		  := $(BUILD_SYSTEM)/build-bitcode.mk
 PREBUILT_SHARED_LIBRARY   := $(BUILD_SYSTEM)/prebuilt-shared-library.mk
 PREBUILT_STATIC_LIBRARY   := $(BUILD_SYSTEM)/prebuilt-static-library.mk
-BUILD_BITCODE             := $(BUILD_SYSTEM)/build-bitcode.mk
 
 ANDROID_MK_INCLUDED := \
   $(CLEAR_VARS) \
@@ -58,6 +58,7 @@ ANDROID_MK_INCLUDED := \
   $(BUILD_STATIC_LIBRARY) \
   $(BUILD_SHARED_LIBRARY) \
   $(BUILD_EXECUTABLE) \
+  $(BUILD_BITCODE) \
   $(PREBUILT_SHARED_LIBRARY) \
 
 
@@ -73,25 +74,37 @@ ALL_HOST_STATIC_LIBRARIES :=
 ALL_STATIC_LIBRARIES      :=
 ALL_SHARED_LIBRARIES      :=
 ALL_EXECUTABLES           :=
+ALL_BITCODE		  :=
 
 WANTED_INSTALLED_MODULES  :=
 
 # the first rule
 all: copy-llvm-toolchains installed_modules host_libraries host_executables
 
-__tmp_src_tree_root := $(NDK_ROOT)
-__tmp_src_tree_root := $(__tmp_src_tree_root:%/$(notdir $(NDK_ROOT))=%)
 
+ANDROID_SOURCE_ROOT := $(NDK_ROOT)/../
 copy-llvm-toolchains:
 	$(info **********************************************************************)
 	$(info Copy llvm toolchains from Android source tree...)
 	$(info If copy failed, please go to $(NDK_ROOT)/sources/llvm-ndk-cc/ and build them at first.)
 	$(info **********************************************************************)
 	@mkdir -p $(NDK_ROOT)/toolchains/llvm/prebuilt/linux-x86/bin/
-	@cp -p $(__tmp_src_tree_root)/out/host/linux-x86/bin/llvm-ndk-cc \
+	@cp -p $(ANDROID_SOURCE_ROOT)/out/host/linux-x86/bin/llvm-ndk-cc \
 	    $(NDK_ROOT)/toolchains/llvm/prebuilt/linux-x86/bin/
-	@cp -p $(__tmp_src_tree_root)/out/host/linux-x86/bin/llvm-ndk-link \
+	@cp -p $(ANDROID_SOURCE_ROOT)/out/host/linux-x86/bin/llvm-ndk-link \
 	    $(NDK_ROOT)/toolchains/llvm/prebuilt/linux-x86/bin/
+
+	$(info Copy NDK toolchains to toolchains/arm-linux-androideabi-4.4.3/prebuilt)
+	$(info **********************************************************************)
+	@mkdir -p $(NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/
+	@cp -r $(NDK_ROOT)/../ndk/toolchains/arm-linux-androideabi-4.4.3/prebuilt $(NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt
+
+	$(info Copy clang from Android source tree...)
+	$(info If copy failed, please go to $(ANDROID_SOURCE_ROOT)/external/llvm and build them at first.)
+	$(info **********************************************************************)
+	@cp -p $(ANDROID_SOURCE_ROOT)/out/host/linux-x86/bin/clang \
+	    $(NDK_ROOT)/toolchains/llvm/prebuilt/linux-x86/bin/llvm-ndk-cc
+
 
 
 $(foreach _app,$(NDK_APPS),\

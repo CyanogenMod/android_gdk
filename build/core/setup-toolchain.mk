@@ -66,8 +66,7 @@ TARGET_CRTEND_O           := $(SYSROOT)/usr/lib/crtend_android.o
 TARGET_CRTBEGIN_SO_O := $(strip $(wildcard $(SYSROOT)/usr/lib/crtbegin_so.o))
 TARGET_CRTEND_SO_O   := $(strip $(wildcard $(SYSROOT)/usr/lib/crtend_so.o))
 
-TARGET_PREBUILT_SHARED_LIBRARIES := libc libstdc++ libm
-TARGET_PREBUILT_SHARED_LIBRARIES := $(TARGET_PREBUILT_SHARED_LIBRARIES:%=$(SYSROOT)/usr/lib/%.so)
+TARGET_PREBUILT_SHARED_LIBRARIES :=
 
 # Define default values for TOOLCHAIN_NAME, this can be overriden in
 # the setup file.
@@ -87,6 +86,8 @@ TOOLCHAIN_PREBUILT_ROOT := $(TOOLCHAIN_ROOT)/prebuilt/$(HOST_TAG)
 TOOLCHAIN_PREFIX := $(call merge,-,$(call chop,$(call split,-,$(TOOLCHAIN_NAME))))-
 TOOLCHAIN_PREFIX := $(TOOLCHAIN_PREBUILT_ROOT)/bin/$(TOOLCHAIN_PREFIX)
 
+BITCODE_TOOLCHAIN_PREFIX := $(NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_TAG)/bin/llvm-ndk-
+
 # Default build commands, can be overriden by the toolchain's setup script
 include $(BUILD_SYSTEM)/default-build-commands.mk
 
@@ -105,7 +106,6 @@ clean-installed-binaries::
 # the proper location
 ifeq ($(NDK_APP_DEBUGGABLE),true)
 
-ifneq ($(TARGET_ARCH),llvm)
 NDK_APP_GDBSERVER := $(NDK_APP_DST_DIR)/gdbserver
 
 installed_modules: $(NDK_APP_GDBSERVER)
@@ -124,17 +124,18 @@ NDK_APP_GDBSETUP := $(NDK_APP_DST_DIR)/gdb.setup
 installed_modules: $(NDK_APP_GDBSETUP)
 
 $(NDK_APP_GDBSETUP): PRIVATE_DST := $(NDK_APP_GDBSETUP)
+$(NDK_APP_GDBSETUP): PRIVATE_DST_DIR := $(NDK_APP_DST_DIR)
 $(NDK_APP_GDBSETUP): PRIVATE_SOLIB_PATH := $(TARGET_OUT)
 $(NDK_APP_GDBSETUP): PRIVATE_SRC_DIRS := $(SYSROOT)/usr/include
 
 $(NDK_APP_GDBSETUP):
 	@ echo "Gdbsetup       : $(call pretty-dir,$(PRIVATE_DST))"
+	$(hide) mkdir -p $(PRIVATE_DST_DIR)
 	$(hide) echo "set solib-search-path $(call host-path,$(PRIVATE_SOLIB_PATH))" > $(PRIVATE_DST)
-	$(hide) echo "directory $(call host-path,$(call uniq,$(PRIVATE_SRC_DIRS)))" >> $(PRIVATE_DST)
+	$(hide) echo "directory $(call host-path,$(call remove-duplicates,$(PRIVATE_SRC_DIRS)))" >> $(PRIVATE_DST)
 
 # This prevents parallel execution to clear gdb.setup after it has been written to
 $(NDK_APP_GDBSETUP): clean-installed-binaries
-endif
 endif
 
 # free the dictionary of LOCAL_MODULE definitions

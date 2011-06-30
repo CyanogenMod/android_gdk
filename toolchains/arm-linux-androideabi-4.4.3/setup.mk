@@ -25,20 +25,11 @@
 
 TARGET_CFLAGS := \
     -fpic \
-    -mthumb-interwork \
     -ffunction-sections \
     -funwind-tables \
     -fstack-protector \
-    -fno-short-enums \
     -D__ARM_ARCH_5__ -D__ARM_ARCH_5T__ \
     -D__ARM_ARCH_5E__ -D__ARM_ARCH_5TE__ \
-
-#
-# Normally, this macro should be defined by the toolchain automatically.
-# Unfortunately, this is not the case, so add it manually. Note that
-# the arm-linux-androideabi toolchain does not have this problem.
-#
-TARGET_CFLAGS += -D__ANDROID__
 
 TARGET_LDFLAGS :=
 
@@ -63,8 +54,8 @@ ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
     TARGET_LDFLAGS += -Wl,--fix-cortex-a8
 else
     TARGET_CFLAGS += -march=armv5te \
-                     -mtune=xscale \
-                     -msoft-float
+                            -mtune=xscale \
+                            -msoft-float
 endif
 
 TARGET_CFLAGS.neon := -mfpu=neon
@@ -119,4 +110,41 @@ $(call add-src-files-target-cflags,\
 $(call set-src-files-text,$(__arm_sources),arm$(space)$(space)) \
 $(call set-src-files-text,$(__thumb_sources),thumb)
 
-TARGET_LIBGCC := $(shell $(TARGET_CC) -mthumb-interwork -print-libgcc-file-name)
+#
+# We need to add -lsupc++ to the final link command to make exceptions
+# and RTTI work properly (when -fexceptions and -frtti are used).
+#
+# Normally, the toolchain should be configured to do that automatically,
+# this will be debugged later.
+#
+define cmd-build-shared-library
+$(TARGET_CXX) \
+    -Wl,-soname,$(notdir $@) \
+    -shared \
+    --sysroot=$(call host-path,$(SYSROOT)) \
+    $(call host-path, $(PRIVATE_OBJECTS)) \
+    $(call link-whole-archives,$(PRIVATE_WHOLE_STATIC_LIBRARIES)) \
+    $(call host-path,\
+        $(PRIVATE_STATIC_LIBRARIES) \
+        $(PRIVATE_SHARED_LIBRARIES)) \
+    $(PRIVATE_LDFLAGS) \
+    $(PRIVATE_LDLIBS) \
+    -lsupc++ \
+    -o $(call host-path,$@)
+endef
+
+define cmd-build-executable
+$(TARGET_CXX) \
+    -Wl,--gc-sections \
+    -Wl,-z,nocopyreloc \
+    --sysroot=$(call host-path,$(SYSROOT)) \
+    $(call host-path, $(PRIVATE_OBJECTS)) \
+    $(call link-whole-archives,$(PRIVATE_WHOLE_STATIC_LIBRARIES)) \
+    $(call host-path,\
+        $(PRIVATE_STATIC_LIBRARIES) \
+        $(PRIVATE_SHARED_LIBRARIES)) \
+    $(PRIVATE_LDFLAGS) \
+    $(PRIVATE_LDLIBS) \
+    -lsupc++ \
+    -o $(call host-path,$@)
+endef
