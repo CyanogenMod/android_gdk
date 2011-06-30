@@ -401,7 +401,7 @@ JNIEXPORT void JNICALL Java_com_example_plasma_llvm_PlasmaView_renderPlasma(JNIE
     double start_jit = now_ms();
 
     BCCScriptRef script_ref = bccCreateScript();
-    if (bccReadFile(script_ref, "/data/local/tmp/libplasma.bc", 1)) {
+    if (bccReadFile(script_ref, "/data/local/tmp/libplasma_portable.bc", 1)) {
         LOGE("Error! Cannot bccReadFile");
         return;
     }

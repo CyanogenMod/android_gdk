@@ -17,7 +17,8 @@ TARGET_NO_EXECUTE_LDFLAGS := -Wl,-z,noexecstack
 
 # Should replace cp with $(BITCODE_LD) but will cause seg fault
 define cmd-build-bitcode
-cp $(call host-path,$(PRIVATE_OBJECTS)) $(call host-path,$@)
+@mkdir -p $(dir $(call host-path,$@))
+@cp $(call host-path,$(PRIVATE_OBJECTS)) $(call host-path,$@)
 endef
 
 # NOTE: Ensure that TARGET_LIBGCC is placed after all private objects
@@ -99,9 +100,12 @@ TARGET_LDFLAGS :=
 TARGET_AR       = $(TOOLCHAIN_PREFIX)ar
 TARGET_ARFLAGS := crs
 
-BITCODE_CC      = $(BITCODE_TOOLCHAIN_PREFIX)cc
-# clang need more arguments. remove when using llvm-ndk-cc
-BITCODE_CFLAGS  = -c -emit-llvm
+#BITCODE_CC      = $(BITCODE_TOOLCHAIN_PREFIX)cc
+#BITCODE_CFLAGS  = -c -emit-llvm -I$(NDK_ROOT)/../external/clang/lib/Headers/
+
+BITCODE_CC      = $(NDK_ROOT)/../out/host/linux-x86/bin/clang
+BITCODE_CFLAGS  = -c -emit-llvm \
+                  -I$(NDK_ROOT)/../external/clang/lib/Headers/
 
 BITCODE_LD      = $(BITCODE_TOOLCHAIN_PREFIX)link
 BITCODE_LDFLAGS =

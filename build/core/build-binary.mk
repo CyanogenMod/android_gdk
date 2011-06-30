@@ -95,8 +95,10 @@ endif
 # the heap and stack by default.
 #
 ifndef ($(LOCAL_DISABLE_NO_EXECUTE),true)
-  LOCAL_CFLAGS += $($(my)NO_EXECUTE_CFLAGS)
-  LOCAL_LDFLAGS += $($(my)NO_EXECUTE_LDFLAGS)
+  ifneq ($(call module-get-class,$(LOCAL_MODULE)),BITCODE)
+    LOCAL_CFLAGS += $($(my)NO_EXECUTE_CFLAGS)
+    LOCAL_LDFLAGS += $($(my)NO_EXECUTE_LDFLAGS)
+  endif
 endif
 
 #
@@ -201,6 +203,15 @@ ifdef unknown_sources
     $(call __ndk_info,  $(unknown_sources))
 endif
 
+#
+# Build the sources to object files
+#
+ifeq ($(call module-get-class,$(LOCAL_MODULE)),BITCODE)
+# Overwrite
+LOCAL_OBJECTS := $(LOCAL_SRC_FILES:%.c=%.bc)
+LOCAL_OBJECTS := $(foreach _obj,$(LOCAL_OBJECTS),$(LOCAL_OBJS_DIR)/$(_obj))
+$(foreach src,$(filter %.c,$(LOCAL_SRC_FILES)), $(call compile-c-source-to-bitcode,$(src)))
+else
 # LOCAL_OBJECTS will list all object files corresponding to the sources
 # listed in LOCAL_SRC_FILES, in the *same* order.
 #
@@ -211,12 +222,6 @@ $(foreach _ext,$(all_source_extensions),\
 LOCAL_OBJECTS := $(filter %.o,$(LOCAL_OBJECTS))
 LOCAL_OBJECTS := $(foreach _obj,$(LOCAL_OBJECTS),$(LOCAL_OBJS_DIR)/$(_obj))
 
-# Build the sources to object files
-#
-ifeq ($(call module-get-class,$(LOCAL_MODULE)),BITCODE)
-LOCAL_OBJECTS :=
-$(foreach src,$(filter %.c,$(LOCAL_SRC_FILES)), $(call compile-c-source-to-bitcode,$(src)))
-else
 $(foreach src,$(filter %.c,$(LOCAL_SRC_FILES)), $(call compile-c-source,$(src)))
 $(foreach src,$(filter %.S %.s,$(LOCAL_SRC_FILES)), $(call compile-s-source,$(src)))
 
@@ -336,10 +341,9 @@ $(LOCAL_INSTALLED): PRIVATE_DST_DIR :=  res/raw
 $(LOCAL_INSTALLED): PRIVATE_DST     := $(PRIVATE_INSTALLED)
 
 $(LOCAL_INSTALLED): $(LOCAL_BUILT_MODULE) clean-installed-binaries
-	@ echo "Install        : $(PRIVATE_NAME) => $(call pretty-dir,$(PRIVATE_DST))"
+	@ echo "Install BC     : $(PRIVATE_NAME) => $(call pretty-dir,$(PRIVATE_DST))"
 	$(hide) mkdir -p $(PRIVATE_DST_DIR)
-	$(hide) install -p $(PRIVATE_SRC) $(PRIVATE_DST)
-	$(hide) $(call cmd-strip, $(PRIVATE_DST))
+	$(hide) cp -p $(PRIVATE_SRC) $(PRIVATE_DST)
 
 else
 $(LOCAL_INSTALLED): PRIVATE_DST_DIR := $(NDK_APP_DST_DIR)
