@@ -363,6 +363,11 @@ stats_endFrame( Stats*  s )
     s->lastTime = now;
 }
 
+void* rsdLookupRuntimeStub(void* pContext, char const* name) {
+    LOGE("ScriptC sym lookup failed for %s", name);
+    return NULL;
+}
+
 JNIEXPORT void JNICALL Java_com_example_plasma_llvm_PlasmaView_renderPlasma(JNIEnv * env, jobject  obj, jobject bitmap,  jlong  time_ms)
 {
     AndroidBitmapInfo  info;
@@ -370,6 +375,8 @@ JNIEXPORT void JNICALL Java_com_example_plasma_llvm_PlasmaView_renderPlasma(JNIE
     int                ret;
     static Stats       stats;
     static int         init;
+    static double      time_sum = 0;
+    static int         count = 0;
 
     if (!init) {
         init_tables();
@@ -391,23 +398,32 @@ JNIEXPORT void JNICALL Java_com_example_plasma_llvm_PlasmaView_renderPlasma(JNIE
         LOGE("AndroidBitmap_lockPixels() failed ! error=%d", ret);
     }
 
+
     //stats_startFrame(&stats);
 
 
     /* Now fill the values with a nice little plasma */
-    //fill_plasma(&info, pixels, time_ms );
     //LOGI("Entering libplasma.so from JNI");
 
     double start_jit = now_ms();
 
+#define JIT 1
+
+#if JIT
     BCCScriptRef script_ref = bccCreateScript();
-    if (bccReadFile(script_ref, "/data/local/tmp/libplasma_portable.bc", 1)) {
+
+    if (bccRegisterSymbolCallback(script_ref, &rsdLookupRuntimeStub, NULL) != 0) {
+        LOGE("bcc: FAILS to register symbol callback");
+        return;
+    }
+
+    if (bccReadFile(script_ref, "/data/local/tmp/libplasma_portable.bc", 0)) {
         LOGE("Error! Cannot bccReadFile");
         return;
     }
     //LOGI("bccReadFile done.");
-#if 0
-  if (bccLinkBC(script_ref, "/system/lib/libclcore", NULL, 1, 0)) {
+#if 1
+  if (bccLinkFile(script_ref, "/system/lib/libclcore.bc", 0)) {
     LOGE("Error! Cannot bccLinkBC");
     return;
   }
@@ -421,12 +437,25 @@ JNIEXPORT void JNICALL Java_com_example_plasma_llvm_PlasmaView_renderPlasma(JNIE
 
     double start_run = now_ms();
 
-    typedef void (*pPlasmaType)(uint32_t, uint32_t, uint32_t, double, uint16_t*);
-    pPlasmaType nativeFunc = (pPlasmaType)bccGetFuncAddr(script_ref, "fill_plasma");
-    nativeFunc(info.width, info.height, info.stride, time_ms, palette);
-
+    typedef void (*pPlasmaType)(uint32_t, uint32_t, uint32_t, double, uint16_t*, void*, void*);
+    pPlasmaType nativeFunc = (pPlasmaType)bccGetFuncAddr(script_ref, "root");
+    if (nativeFunc == NULL) {
+        LOGE("Error! Cannot find fill_plasma()");
+        return;
+    }
+    nativeFunc(info.width, info.height, info.stride, time_ms, palette, pixels, angle_sin_tab);
     bccDisposeScript(script_ref);
-    LOGI("Time LLVM JIT: %.2lf , Run: %.2lf", start_run-start_jit, now_ms()-start_run);
+    double diff = now_ms()-start_run;
+    LOGI("LLVM Time JIT: %.2lf , Run: %.2lf, Avg: %.2lf", start_run-start_jit, diff, time_sum / count);
+#else
+    double start_run = now_ms();
+    fill_plasma(&info, pixels, time_ms );
+    double diff = now_ms()-start_run;
+    LOGI("GCC Time Run: %.2lf, Avg: %.2lf", diff, time_sum / count);
+#endif
+    time_sum += diff;
+    count++;
+
 
     AndroidBitmap_unlockPixels(env, bitmap);
     

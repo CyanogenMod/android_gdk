@@ -48,8 +48,8 @@ class PlasmaView extends View {
     public PlasmaView(Context context) {
         super(context);
 
-        final int W = 200;
-        final int H = 200;
+        final int W = 480;
+        final int H = 800;
 
         mBitmap = Bitmap.createBitmap(W, H, Bitmap.Config.RGB_565);
         mStartTime = System.currentTimeMillis();

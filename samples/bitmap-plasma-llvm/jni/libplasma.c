@@ -64,7 +64,8 @@ typedef int32_t  Angle;
 #  define  ANGLE_TO_FIXED(x)       (Fixed)((x) >> (ANGLE_BITS - FIXED_BITS))
 #endif
 
-static Fixed  angle_sin_tab[ANGLE_2PI+1];
+static Fixed  *angle_sin_tab;
+//static Fixed  angle_sin_tab[ANGLE_2PI+1];
 
 static __inline__ Fixed angle_sin( Angle  a )
 {
@@ -102,7 +103,7 @@ static uint16_t  make565(int red, int green, int blue)
                        ((blue  >> 3) & 0x001f) );
 }
 
-static void init_palette(void)
+static void init_palette(uint16_t *palette)
 {
     int  nn, mm = 0;
     /* fun with colors */
@@ -136,15 +137,14 @@ static __inline__ uint16_t  palette_from_fixed(uint16_t* palette, Fixed  x )
 }
 
 
-void fill_plasma(uint32_t width, uint32_t height, uint32_t stride, double  t, uint16_t* palette)
+extern void root(uint32_t width, uint32_t height, uint32_t stride, double  t, uint16_t* palette, void* pixels, void *_angle_sin_tab)
 {
+    angle_sin_tab = _angle_sin_tab;
     Fixed ft  = FIXED_FROM_FLOAT(t/1000.);
     Fixed yt1 = FIXED_FROM_FLOAT(t/1230.);
     Fixed yt2 = yt1;
     Fixed xt10 = FIXED_FROM_FLOAT(t/3000.);
     Fixed xt20 = xt10;
-
-    uint16_t pixels[width*height];
 
 #define  YT1_INCR   FIXED_FROM_FLOAT(1/100.)
 #define  YT2_INCR   FIXED_FROM_FLOAT(1/163.)
@@ -199,7 +199,7 @@ void fill_plasma(uint32_t width, uint32_t height, uint32_t stride, double  t, ui
         }
 
         // go to next line
-        //pixels = (char*)pixels + stride;
+        pixels = (char*)pixels + stride;
     }
 }
 
