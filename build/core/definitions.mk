@@ -1143,7 +1143,7 @@ _FLAGS := $$($$(my)CXXFLAGS) \
 _CC   := $$($$(my)CXX)
 _TEXT := "Compile++ $$(call get-src-file-text,$1)"
 
-$$(eval $$(call ev-build-source-file))
+$$(eval $$(call ev-build-file)) # FIXME 
 endef
 
 # -----------------------------------------------------------------------------

@@ -6,7 +6,7 @@ LOCAL_CFLAGS := -I/usr/local/google/work/m/frameworks/compile/libbcc/include/
 LOCAL_LDFLAGS := -L/usr/local/google/work/m/out/target/product/crespo4g/system/lib/
 
 LOCAL_MODULE    := plasma
-LOCAL_SRC_FILES := plasmaLLVM.c
+LOCAL_SRC_FILES := plasmaLLVM.cpp
 LOCAL_LDLIBS    := -lm -llog -ljnigraphics -lbcc
 
 include $(BUILD_SHARED_LIBRARY)

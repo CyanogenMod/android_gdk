@@ -1,0 +1,4 @@
+samples/*/libs
+samples/*/obj
+samples/*/res/raw
+toolchains/*/prebuilt

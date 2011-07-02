@@ -363,12 +363,9 @@ stats_endFrame( Stats*  s )
     s->lastTime = now;
 }
 
-void* rsdLookupRuntimeStub(void* pContext, char const* name) {
-    LOGE("ScriptC sym lookup failed for %s", name);
-    return NULL;
-}
-
-JNIEXPORT void JNICALL Java_com_example_plasma_llvm_PlasmaView_renderPlasma(JNIEnv * env, jobject  obj, jobject bitmap,  jlong  time_ms)
+extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_nativeRenderPlasma
+    (JNIEnv * env, jobject  obj,
+     jobject bitmap,  jlong  time_ms, jbyteArray scriptRef, jint length, jboolean use_llvm)
 {
     AndroidBitmapInfo  info;
     void*              pixels;
@@ -377,6 +374,11 @@ JNIEXPORT void JNICALL Java_com_example_plasma_llvm_PlasmaView_renderPlasma(JNIE
     static int         init;
     static double      time_sum = 0;
     static int         count = 0;
+    static bool        last_mode = false;
+
+    if (last_mode != use_llvm)
+      count = 0, time_sum = 0;
+    last_mode = use_llvm;
 
     if (!init) {
         init_tables();
@@ -386,12 +388,12 @@ JNIEXPORT void JNICALL Java_com_example_plasma_llvm_PlasmaView_renderPlasma(JNIE
 
     if ((ret = AndroidBitmap_getInfo(env, bitmap, &info)) < 0) {
         LOGE("AndroidBitmap_getInfo() failed ! error=%d", ret);
-        return;
+        return -1;
     }
 
     if (info.format != ANDROID_BITMAP_FORMAT_RGB_565) {
         LOGE("Bitmap format is not RGB_565 !");
-        return;
+        return -1;
     }
 
     if ((ret = AndroidBitmap_lockPixels(env, bitmap, &pixels)) < 0) {
@@ -399,65 +401,55 @@ JNIEXPORT void JNICALL Java_com_example_plasma_llvm_PlasmaView_renderPlasma(JNIE
     }
 
 
-    //stats_startFrame(&stats);
+    if (use_llvm) {
+      double start_jit = now_ms();
+      
+      BCCScriptRef script_ref = bccCreateScript();
 
+      jbyte* script_ptr = (jbyte *)env->GetPrimitiveArrayCritical(scriptRef, (jboolean *)0);
 
-    /* Now fill the values with a nice little plasma */
-    //LOGI("Entering libplasma.so from JNI");
+      LOGE("BCC Script Len: %d", length);
+      if(bccReadBC(script_ref, "libplasma.bc", (const char*)script_ptr, length, 0)) {
+        LOGE("Error! Cannot bccReadBc");
+        return -1;
+      }
+      if (script_ptr) {
+        env->ReleasePrimitiveArrayCritical(scriptRef, script_ptr, 0);
+      }
 
-    double start_jit = now_ms();
+      if (bccLinkFile(script_ref, "/system/lib/libclcore.bc", 0)) {
+        LOGE("Error! Cannot bccLinkBC");
+        return -1;
+      }
 
-#define JIT 1
-
-#if JIT
-    BCCScriptRef script_ref = bccCreateScript();
-
-    if (bccRegisterSymbolCallback(script_ref, &rsdLookupRuntimeStub, NULL) != 0) {
-        LOGE("bcc: FAILS to register symbol callback");
-        return;
-    }
-
-    if (bccReadFile(script_ref, "/data/local/tmp/libplasma_portable.bc", 0)) {
-        LOGE("Error! Cannot bccReadFile");
-        return;
-    }
-    //LOGI("bccReadFile done.");
-#if 1
-  if (bccLinkFile(script_ref, "/system/lib/libclcore.bc", 0)) {
-    LOGE("Error! Cannot bccLinkBC");
-    return;
-  }
-  LOGI("bccLinkBC done.");
-#endif
-    if (bccPrepareExecutable(script_ref, "@@/data/data/com.example.plasma.llvm/plasmaLLVM.oBCC", 0)) {
+      if (bccPrepareExecutable(script_ref, "@@/data/data/com.example.plasma.llvm/plasmaLLVM.oBCC", 0)) {
         LOGE("Error! Cannot bccPrepareExecutable");
-        return;
-    }
-    //LOGI("bccPrepareExecutable done.");
+        return -1;
+      }
 
-    double start_run = now_ms();
+      double start_run = now_ms();
 
-    typedef void (*pPlasmaType)(uint32_t, uint32_t, uint32_t, double, uint16_t*, void*, void*);
-    pPlasmaType nativeFunc = (pPlasmaType)bccGetFuncAddr(script_ref, "root");
-    if (nativeFunc == NULL) {
+      typedef void (*pPlasmaType)(uint32_t, uint32_t, uint32_t, double, uint16_t*, void*, void*);
+      pPlasmaType nativeFunc = (pPlasmaType)bccGetFuncAddr(script_ref, "root");
+      if (nativeFunc == NULL) {
         LOGE("Error! Cannot find fill_plasma()");
-        return;
+        return -1;
+      }
+      nativeFunc(info.width, info.height, info.stride, time_ms, palette, pixels, angle_sin_tab);
+      bccDisposeScript(script_ref);
+      double diff = now_ms()-start_run;
+      LOGI("LLVM Time JIT: %.2lf , Run: %.2lf, Avg: %.2lf", start_run-start_jit, diff, time_sum / count);
+      time_sum += diff + start_run - start_jit;
+    } else {
+      double start_run = now_ms();
+      fill_plasma(&info, pixels, time_ms );
+      double diff = now_ms()-start_run;
+      LOGI("GCC Time Run: %.2lf, Avg: %.2lf", diff, time_sum / count);
+      time_sum += diff;
     }
-    nativeFunc(info.width, info.height, info.stride, time_ms, palette, pixels, angle_sin_tab);
-    bccDisposeScript(script_ref);
-    double diff = now_ms()-start_run;
-    LOGI("LLVM Time JIT: %.2lf , Run: %.2lf, Avg: %.2lf", start_run-start_jit, diff, time_sum / count);
-#else
-    double start_run = now_ms();
-    fill_plasma(&info, pixels, time_ms );
-    double diff = now_ms()-start_run;
-    LOGI("GCC Time Run: %.2lf, Avg: %.2lf", diff, time_sum / count);
-#endif
-    time_sum += diff;
     count++;
-
 
     AndroidBitmap_unlockPixels(env, bitmap);
 
-    //stats_endFrame(&stats);
+    return count * 1000.0 / time_sum;
 }
