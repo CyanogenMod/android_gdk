@@ -29,6 +29,8 @@
 #include "llvm/Module.h"
 #include "llvm/Metadata.h"
 
+#include "llvm/MC/SubtargetFeature.h"
+
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/InstIterator.h"
 
@@ -36,7 +38,6 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Target/TargetRegistry.h"
-#include "llvm/Target/SubtargetFeature.h"
 
 namespace ndkpc {
 
@@ -135,8 +136,6 @@ bool Backend::CreateCodeGenPasses() {
   if (mTargetOpts.CPU.size() || mTargetOpts.Features.size()) {
     llvm::SubtargetFeatures Features;
 
-    Features.setCPU(mTargetOpts.CPU);
-
     for (std::vector<std::string>::const_iterator
              I = mTargetOpts.Features.begin(), E = mTargetOpts.Features.end();
          I != E;
@@ -146,7 +145,7 @@ bool Backend::CreateCodeGenPasses() {
     FeaturesStr = Features.getString();
   }
   llvm::TargetMachine *TM =
-      TargetInfo->createTargetMachine(Triple, FeaturesStr);
+      TargetInfo->createTargetMachine(Triple, mTargetOpts.CPU, FeaturesStr);
 
   // Register scheduler
   llvm::RegisterScheduler::setDefault(llvm::createDefaultScheduler);
