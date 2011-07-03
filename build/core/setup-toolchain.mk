@@ -108,7 +108,11 @@ ifeq ($(NDK_APP_DEBUGGABLE),true)
 
 NDK_APP_GDBSERVER := $(NDK_APP_DST_DIR)/gdbserver
 
+ifeq ($(TARGET_ARCH),llvm)
+installed_modules:
+else
 installed_modules: $(NDK_APP_GDBSERVER)
+endif
 
 $(NDK_APP_GDBSERVER): PRIVATE_NAME    := $(TOOLCHAIN_NAME)
 $(NDK_APP_GDBSERVER): PRIVATE_SRC     := $(TARGET_GDBSERVER)
