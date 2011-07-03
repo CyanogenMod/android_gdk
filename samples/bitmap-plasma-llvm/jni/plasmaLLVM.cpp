@@ -409,7 +409,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
       jbyte* script_ptr = (jbyte *)env->GetPrimitiveArrayCritical(scriptRef, (jboolean *)0);
 
       LOGE("BCC Script Len: %d", length);
-      if(bccReadBC(script_ref, "libplasma.bc", (const char*)script_ptr, length, 0)) {
+      if(bccReadBC(script_ref, "libplasma_portable.bc", (const char*)script_ptr, length, 0)) {
         LOGE("Error! Cannot bccReadBc");
         return -1;
       }
