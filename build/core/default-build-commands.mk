@@ -16,10 +16,11 @@ TARGET_NO_EXECUTE_CFLAGS  := -Wa,--noexecstack
 TARGET_NO_EXECUTE_LDFLAGS := -Wl,-z,noexecstack
 
 # Should replace cp with $(BITCODE_LD) but will cause seg fault
-#define cmd-build-bitcode
-#	@mkdir -p $(dir $(call host-path,$@))
-#	@cp $(call host-path,$(PRIVATE_OBJECTS)) $(call host-path,$@)
-#endef
+# FIXME(Nowar): After refactoring, we should not use this anymore.
+define cmd-build-bitcode
+	@mkdir -p $(dir $(call host-path,$@))
+	@cp $(call host-path,$(PRIVATE_OBJECTS)) $(call host-path,$@)
+endef
 
 # NOTE: Ensure that TARGET_LIBGCC is placed after all private objects
 #       and static libraries, but before any other library in the link
