@@ -57,8 +57,8 @@ endif
 LOCAL_OBJECTS :=
 
 # always define ANDROID when building binaries
-#
-LOCAL_CFLAGS := -DANDROID $(LOCAL_CFLAGS)
+# -DANDROID is deprecated.
+LOCAL_CFLAGS := -D__ANDROID__ -DANDROID $(LOCAL_CFLAGS)
 
 #
 # Add the default system shared libraries to the build
@@ -277,6 +277,7 @@ $(LOCAL_BUILT_MODULE): $(LOCAL_OBJECTS)
 	@ echo "Bitcode        : $(PRIVATE_NAME)"
 	$(hide) rm -rf $@
 	$(hide) $(cmd-build-bitcode)
+
 ALL_BITCODE += $(LOCAL_BUILT_MODULE)
 endif
 
@@ -335,6 +336,7 @@ $(LOCAL_INSTALLED): PRIVATE_NAME    := $(notdir $(LOCAL_BUILT_MODULE))
 $(LOCAL_INSTALLED): PRIVATE_SRC     := $(LOCAL_BUILT_MODULE)
 
 ifeq ($(call module-get-class,$(LOCAL_MODULE)),BITCODE)
+# FIXME(Nowar): What bug? Please write it down.
 # BUG FIXME
 $(LOCAL_INSTALLED): PRIVATE_INSTALLED := res/raw/$(PRIVATE_NAME)
 $(LOCAL_INSTALLED): PRIVATE_DST_DIR :=  res/raw
