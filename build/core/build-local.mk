@@ -42,4 +42,4 @@ include $(GDK_ROOT)/build/core/build-modules.mk
 # Trasnfer the control to NDK
 #
 # ############################################################################
-#include $(NDK_ROOT)/build/core/build-local.mk
+include $(NDK_ROOT)/build/core/build-local.mk
