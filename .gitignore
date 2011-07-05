@@ -2,5 +2,4 @@ samples/*/bin
 samples/*/gen
 samples/*/libs
 samples/*/obj
-samples/*/res/raw
-toolchains/*/prebuilt
+samples/*/res/raw/*.bc
