@@ -17,16 +17,12 @@ include $(GDK_TOOLCHAIN_ROOT)/setup.mk
 
 ALL_BITCODE_MODULES :=
 
+-include $(GDK_PROJECT_ROOT)/jni/Android-portable.mk
+
 # The first rule
 all: bitcode_modules
 
-clean:
-	rm -rf $(LOCAL_PATH)/obj/llvm/
-	rm -rf $(LOCAL_PATH)/res/raw/*.bc
-
-include $(GDK_PROJECT_ROOT)/jni/Android-portable.mk
-
-bitcode_modules: clean $(ALL_BITCODE_MODULES)
+bitcode_modules: $(ALL_BITCODE_MODULES)
 
 # Now all modules are in ALL_BITCODE_MODULES
 # Take them out for each and build it
