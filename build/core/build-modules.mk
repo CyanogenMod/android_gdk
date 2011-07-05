@@ -47,7 +47,9 @@ endef
 # $2: LOCAL_MODULE
 #
 define cmd-link-bc
-$(info $(BITCODE_LD) $(GDK_PROJECT_OBJ)/$(2)/*.bc -o $(GDK_PROJECT_OUT)/lib$(2).bc)
+$(info $(BITCODE_LD) $(GDK_PROJECT_OBJ)/$(2)/*.bc\
+  $(BITCODE_LDFLAGS)\
+  -o $(GDK_PROJECT_OUT)/lib$(2).bc)
 endef
 
 $(foreach gdk_module, $(ALL_BITCODE_MODULES),\
