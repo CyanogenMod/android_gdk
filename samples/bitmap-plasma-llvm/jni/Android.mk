@@ -13,10 +13,3 @@ LOCAL_SRC_FILES := plasmaLLVM.cpp
 LOCAL_LDLIBS    := -lm -llog -ljnigraphics -lbcc
 
 include $(BUILD_SHARED_LIBRARY)
-
-include $(CLEAR_VARS)
-
-LOCAL_MODULE    := plasma_portable
-LOCAL_SRC_FILES := libplasma.c
-
-include $(BUILD_BITCODE)
