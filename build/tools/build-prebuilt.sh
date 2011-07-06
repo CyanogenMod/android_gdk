@@ -6,8 +6,8 @@ AndroidRoot=""
 function echoHelp {
   echo "Build tools into <GDK>/toolchins/llvm/prebuilt/"
   echo "$0"
-  echo "  --gdk-root=         GDK root location"
-  echo "  --android-root=     Android source tree root location"
+  echo "  --gdk-root=         GDK root absolute path"
+  echo "  --android-root=     Android source tree root absolute path"
   echo
 }
 
@@ -33,7 +33,7 @@ function main {
   assertVar gdk-root $1
   assertVar android-root $2
 
-  if [ `find $AndroidRoot | grep $GdkRoot | wc -l` -eq 0 ]; then
+  if [ -z `echo $GdkRoot | awk -F $AndroidRoot '{print $2}'` ]; then
     echo "Please put <GDK> under <AndroidSrcRoot>."
     echo "Since building <GDK>/sources/llvm-ndk-cc/ needs Android source building system."
     echo
