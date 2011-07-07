@@ -22,13 +22,13 @@ $(call check-LOCAL_MODULE,$(LOCAL_MAKEFILE))
 #
 LOCAL_MODULE_CLASS := $(strip $(LOCAL_MODULE_CLASS))
 ifndef LOCAL_MODULE_CLASS
-$(call __ndk_info,$(LOCAL_MAKEFILE):$(LOCAL_MODULE): LOCAL_MODULE_CLASS definition is missing !)
-$(call __ndk_error,Aborting)
+$(call __gdk_info,$(LOCAL_MAKEFILE):$(LOCAL_MODULE): LOCAL_MODULE_CLASS definition is missing !)
+$(call __gdk_error,Aborting)
 endif
 
 $(if $(call module-class-check,$(LOCAL_MODULE_CLASS)),,\
-$(call __ndk_info,$(LOCAL_MAKEFILE):$(LOCAL_MODULE): Unknown LOCAL_MODULE_CLASS value: $(LOCAL_MODULE_CLASS))\
-$(call __ndk_error,Aborting)\
+$(call __gdk_info,$(LOCAL_MAKEFILE):$(LOCAL_MODULE): Unknown LOCAL_MODULE_CLASS value: $(LOCAL_MODULE_CLASS))\
+$(call __gdk_error,Aborting)\
 )
 
 $(call module-add,$(LOCAL_MODULE))

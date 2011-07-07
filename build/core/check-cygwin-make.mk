@@ -37,7 +37,7 @@ CYGWIN_MAKE := $(CYGWIN_MAKE:%.exe=%)
 #
 SELF_MAKE := $(strip $(wildcard $(CYGWIN_MAKE).exe))
 ifeq ($(SELF_MAKE),)
-    $(error Android NDK: $(firstword $(MAKE)) is not cygwin-compatible)
+    $(error Android GDK: $(firstword $(MAKE)) is not cygwin-compatible)
 endif
 
 # that's all
