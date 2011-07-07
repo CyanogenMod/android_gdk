@@ -44,13 +44,13 @@ if [ $# -lt 1 ]; then
   exit 1
 fi
 
-if [ `echo $1 | awk -F '--' '{print $1}' | awk -F '=' '{print $1}' != "ndk-root"` ]; then
+if [ `echo $1 | awk -F '=' '{print $1}'` != "--ndk-root" ]; then
   echo "Usage: $0 --ndk-root=<where> ..."
   echo
   exit 1
 fi
 
-NDK_ROOT=`echo $1 | awk -F '--' '{print $2}' | awk -F '=' '{print $2}'`
+NDK_ROOT=`echo $1 | awk -F '=' '{print $2}'`
 shift 1
 
 PROGDIR=`dirname $0`
