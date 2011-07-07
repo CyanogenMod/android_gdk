@@ -89,13 +89,3 @@ include $(BUILD_SYSTEM)/add-application.mk
 
 # Build it
 include $(BUILD_SYSTEM)/build-all.mk
-
-
-#
-# Transfer the control to NDK
-#
-ifndef NDK_ROOT
-  $(info Android GDK: You must specify NDK_ROOT.)
-  $(error Abort.)
-endif
-include $(NDK_ROOT)/build/core/build-local.mk
