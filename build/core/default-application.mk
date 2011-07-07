@@ -1,4 +1,4 @@
-# Copyright (C) 2009 The Android Open Source Project
+# Copyright (C) 2010 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,10 +13,11 @@
 # limitations under the License.
 #
 
-# this file is included repeatedly from Android-portable.mk files in order to clean
-# the module-specific variables from the environment,
+# This is the default Application.mk that is being used for applications
+# that don't provide $PROJECT_PATH/jni/Application.mk
+#
+APP_PROJECT_PATH := $(GDK_PROJECT_PATH)
 
-$(call clear-src-tags)
+# We expect the build script to be located here
+APP_BUILD_SCRIPT := $(APP_PROJECT_PATH)/jni/Android-portable.mk
 
-# Note: As a special exception, we don't want to clear LOCAL_PATH
-$(call clear-vars, $(filter-out LOCAL_PATH,$(modules-LOCALS:%=LOCAL_%)))

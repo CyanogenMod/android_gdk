@@ -1,4 +1,4 @@
-# Copyright (C) 2009 The Android Open Source Project
+# Copyright (C) 2010 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,10 +13,15 @@
 # limitations under the License.
 #
 
-# this file is included repeatedly from Android-portable.mk files in order to clean
-# the module-specific variables from the environment,
+# this file is included from Android.mk files to build a target-specific
+# shared library
+#
 
-$(call clear-src-tags)
+LOCAL_BUILD_SCRIPT := PREBUILT_SHARED_LIBRARY
+LOCAL_MODULE_CLASS := PREBUILT_SHARED_LIBRARY
+LOCAL_MAKEFILE     := $(local-makefile)
 
-# Note: As a special exception, we don't want to clear LOCAL_PATH
-$(call clear-vars, $(filter-out LOCAL_PATH,$(modules-LOCALS:%=LOCAL_%)))
+LOCAL_PREBUILT_PREFIX := lib
+LOCAL_PREBUILT_SUFFIX := .so
+
+include $(BUILD_SYSTEM)/prebuilt-library.mk
