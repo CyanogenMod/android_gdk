@@ -105,4 +105,6 @@ fi
 $GNUMAKE -f $PROGDIR/build/core/build-local.mk "$@"
 
 # Transfer the control power to NDK
-$GNUMAKE -f $NDK_ROOT/build/core/build-local.mk "$@"
+if [ $? -eq 0 ]; then
+  $GNUMAKE -f $NDK_ROOT/build/core/build-local.mk "$@"
+fi
