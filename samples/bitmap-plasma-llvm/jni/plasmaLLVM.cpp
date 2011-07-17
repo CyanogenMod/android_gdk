@@ -422,7 +422,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
         return -1;
       }
 
-      if (bccPrepareExecutable(script_ref, "@@/data/data/com.example.plasma.llvm/plasmaLLVM.oBCC", 0)) {
+      if (bccPrepareExecutableEx(script_ref, "/data/data/com.example.plasma.llvm/", "plasmaLLVM", 0)) {
         LOGE("Error! Cannot bccPrepareExecutable");
         return -1;
       }
