@@ -56,6 +56,12 @@ shift 1
 PROGDIR=`dirname $0`
 PROGDIR=`cd $PROGDIR && pwd`
 
+if [ -z "$OUT" ] ; then
+  echo "ERROR: Your OUT variable is not defined. Please set it by running \"lunch PRODUCT\""
+  echo "This is a workaroud for libbcc"
+  exit 1
+fi
+
 # If GNUMAKE is defined, check that it points to a valid file
 if [ -n "$GNUMAKE" ] ; then
     ABS_GNUMAKE=`which $GNUMAKE 2> /dev/null`
@@ -102,7 +108,7 @@ if [ "$OSTYPE" = "cygwin" ] ; then
     fi
 fi
 
-$GNUMAKE -f $PROGDIR/build/core/build-local.mk "$@"
+NDK_ROOT=$NDK_ROOT $GNUMAKE -f $PROGDIR/build/core/build-local.mk "$@"
 
 # Transfer the control power to NDK
 if [ $? -eq 0 ]; then
