@@ -403,7 +403,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
 
     if (use_llvm) {
       double start_jit = now_ms();
-      
+
       BCCScriptRef script_ref = bccCreateScript();
 
       jbyte* script_ptr = (jbyte *)env->GetPrimitiveArrayCritical(scriptRef, (jboolean *)0);
@@ -422,7 +422,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
         return -1;
       }
 
-      if (bccPrepareExecutableEx(script_ref, "/data/data/com.example.plasma.llvm/", "plasmaLLVM", 0)) {
+      if (bccPrepareExecutable(script_ref, "/data/data/com.example.plasma.llvm/", "plasmaLLVM", 0)) {
         LOGE("Error! Cannot bccPrepareExecutable");
         return -1;
       }
