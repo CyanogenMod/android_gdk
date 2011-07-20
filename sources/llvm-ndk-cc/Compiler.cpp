@@ -51,7 +51,7 @@ static inline llvm::tool_output_file *openOutputFile(const char *OutputFile,
                                                      unsigned Flags,
                                                      std::string* Error,
                                                      clang::Diagnostic* Diag) {
-  assert((OutputFile != NULL) && (Error != NULL) && (Diag != NULL) && 
+  assert((OutputFile != NULL) && (Error != NULL) && (Diag != NULL) &&
               "Invalid parameter!");
 
   llvm::tool_output_file *F =
@@ -72,7 +72,7 @@ void Compiler::LLVMErrorHandler(void *UserData, const std::string &Message) {
 }
 
 void Compiler::createDiagnostic() {
-  mpDiagClient = new clang::TextDiagnosticPrinter(llvm::errs(), 
+  mpDiagClient = new clang::TextDiagnosticPrinter(llvm::errs(),
                                                  clang::DiagnosticOptions());
   mDiagIDs = new clang::DiagnosticIDs();
   mDiagnostics = new clang::Diagnostic(mDiagIDs, mpDiagClient, true);
@@ -165,7 +165,7 @@ Compiler::Compiler() : mInitialized(false), mpDiagClient(NULL), mOT(OT_Default) 
 
 void Compiler::injectPreDefined() {
   typedef std::map<std::string, std::string> SymbolMapTy;
-  for (SymbolMapTy::iterator 
+  for (SymbolMapTy::iterator
           it = mPreDefinedSymbolMap.begin(), et = mPreDefinedSymbolMap.end();
        it != et; ++it) {
     std::string Str = "#define "+it->first+" "+it->second+"\n";

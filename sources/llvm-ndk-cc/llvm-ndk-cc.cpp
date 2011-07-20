@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
       new clang::TextDiagnosticPrinter(llvm::errs(), clang::DiagnosticOptions());
   DiagClient->setPrefix(argv[0]);
 
-  llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs> 
+  llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs>
       DiagIDs(new clang::DiagnosticIDs());
   clang::Diagnostic Diags(DiagIDs, DiagClient, true);
 

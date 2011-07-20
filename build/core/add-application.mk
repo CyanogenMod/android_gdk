@@ -146,10 +146,14 @@ else
     endif
 endif
 
+# set release/debug build flags. We always use the -g flag because
+# we generate symbol versions of the binaries that are later stripped
+# when they are copied to the final project's libs/<abi> directory.
+#
 ifeq ($(APP_OPTIM),debug)
   APP_CFLAGS := -O0 -g $(APP_CFLAGS)
 else
-  APP_CFLAGS := -O2 -DNDEBUG $(APP_CFLAGS)
+  APP_CFLAGS := -O2 -DNDEBUG -g $(APP_CFLAGS)
 endif
 
 $(if $(call get,$(_map),defined),\

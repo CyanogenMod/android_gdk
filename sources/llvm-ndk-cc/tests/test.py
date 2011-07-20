@@ -42,7 +42,7 @@ def runFileTest(Filename):
   Cmd = ('../../../../../out/host/linux-x86/bin/llvm-ndk-cc'
          ' -I../../../../platforms/android-100/arch-llvm/usr/include'
          ' -I{0}'.format(os.path.dirname(os.path.realpath(Filename))))
-  
+
   BaseArgs = Cmd.split()
   FilenameStubs = Filename.split('.')
   FileBasename = FilenameStubs[0]
@@ -50,7 +50,7 @@ def runFileTest(Filename):
   Args.append(Filename)
   Args.append('-o')
   Args.append(FileBasename + '.bc')
-  
+
   StdoutFile = open('{0}.stdout.txt'.format(FileBasename), 'w+')
   StderrFile = open('{0}.stderr.txt'.format(FileBasename), 'w+')
 
@@ -101,7 +101,7 @@ def runTest(Dirname):
   Result = True
   for FilePassed in FilesPassed:
     Result = Result and FilePassed
-  
+
   if Dirname[0:2] == 'F_':
     if Result == True:
       Result = False
@@ -126,14 +126,14 @@ def runTest(Dirname):
     Ret = subprocess.call(Args)
     if Ret != 0:
       Result = False;
-    
+
     if Options.Verbose > 1:
       print()
       print('Executing:',end=' ')
       for Arg in Args:
         print(Arg,end=' ')
       print()
-  
+
 
   if Options.Cleanup:
     for File in glob.glob('*.stdout.txt'):

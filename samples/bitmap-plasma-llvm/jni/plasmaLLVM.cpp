@@ -363,6 +363,8 @@ stats_endFrame( Stats*  s )
     s->lastTime = now;
 }
 
+typedef void (*pPlasmaType)(uint32_t, uint32_t, uint32_t, double, uint16_t*, void*, void*);
+
 extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_nativeRenderPlasma
     (JNIEnv * env, jobject  obj,
      jobject bitmap,  jlong  time_ms, jbyteArray scriptRef, jint length, jboolean use_llvm)
@@ -375,6 +377,8 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
     static double      time_sum = 0;
     static int         count = 0;
     static bool        last_mode = false;
+    static pPlasmaType native_function = NULL;
+    static BCCScriptRef script_ref;
 
     if (last_mode != use_llvm)
       count = 0, time_sum = 0;
@@ -404,39 +408,38 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
     if (use_llvm) {
       double start_jit = now_ms();
 
-      BCCScriptRef script_ref = bccCreateScript();
+      if (native_function == NULL) {
+        script_ref = bccCreateScript();
 
-      jbyte* script_ptr = (jbyte *)env->GetPrimitiveArrayCritical(scriptRef, (jboolean *)0);
+        jbyte* script_ptr = (jbyte *)env->GetPrimitiveArrayCritical(scriptRef, (jboolean *)0);
 
-      LOGE("BCC Script Len: %d", length);
-      if(bccReadBC(script_ref, "libplasma_portable.bc", (const char*)script_ptr, length, 0)) {
-        LOGE("Error! Cannot bccReadBc");
-        return -1;
-      }
-      if (script_ptr) {
-        env->ReleasePrimitiveArrayCritical(scriptRef, script_ptr, 0);
-      }
+        LOGI("BCC Script Len: %d", length);
+        if(bccReadBC(script_ref, "libplasma_portable.bc", (const char*)script_ptr, length, 0)) {
+          LOGE("Error! Cannot bccReadBc");
+          return -1;
+        }
+        if (script_ptr) {
+          env->ReleasePrimitiveArrayCritical(scriptRef, script_ptr, 0);
+        }
 
-      if (bccLinkFile(script_ref, "/system/lib/libclcore.bc", 0)) {
-        LOGE("Error! Cannot bccLinkBC");
-        return -1;
-      }
+        if (bccLinkFile(script_ref, "/system/lib/libclcore.bc", 0)) {
+          LOGE("Error! Cannot bccLinkBC");
+          return -1;
+        }
 
-      if (bccPrepareExecutable(script_ref, "/data/data/com.example.plasma.llvm/", "plasmaLLVM", 0)) {
-        LOGE("Error! Cannot bccPrepareExecutable");
-        return -1;
+        if (bccPrepareExecutable(script_ref, "/data/data/com.example.plasma.llvm/", "plasmaLLVM", 0)) {
+          LOGE("Error! Cannot bccPrepareExecutable");
+          return -1;
+        }
+        native_function = (pPlasmaType)bccGetFuncAddr(script_ref, "root");
+        if (native_function == NULL) {
+          LOGE("Error! Cannot find fill_plasma()");
+          return -1;
+        }
       }
 
       double start_run = now_ms();
-
-      typedef void (*pPlasmaType)(uint32_t, uint32_t, uint32_t, double, uint16_t*, void*, void*);
-      pPlasmaType nativeFunc = (pPlasmaType)bccGetFuncAddr(script_ref, "root");
-      if (nativeFunc == NULL) {
-        LOGE("Error! Cannot find fill_plasma()");
-        return -1;
-      }
-      nativeFunc(info.width, info.height, info.stride, time_ms, palette, pixels, angle_sin_tab);
-      bccDisposeScript(script_ref);
+      native_function(info.width, info.height, info.stride, time_ms, palette, pixels, angle_sin_tab);
       double diff = now_ms()-start_run;
       LOGI("LLVM Time JIT: %.2lf , Run: %.2lf, Avg: %.2lf", start_run-start_jit, diff, time_sum / count);
       time_sum += diff + start_run - start_jit;

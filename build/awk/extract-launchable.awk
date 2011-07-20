@@ -39,7 +39,7 @@ BEGIN {
         event = XML_TYPE "-" XML_TAG;
         # When entering a new <activity>, extract its name and set
         # the 'launchable' flag to false.
-        if ( event == "BEGIN-ACTIVITY" && 
+        if ( event == "BEGIN-ACTIVITY" &&
              XML_RPATH == "ACTIVITY/APPLICATION/MANIFEST/" ) {
             name = XML_ATTR["android:name"];
             launchable = 0;
