@@ -8,11 +8,10 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_SRC_FILES := plasmaLLVM.cpp
 
-LOCAL_C_INCLUDES := $(NDK_ROOT)/../frameworks/compile/libbcc/include
+LOCAL_C_INCLUDES := $(OUT)/../../../../frameworks/compile/libbcc/include
 
 # Workaround. libbcc is not part of NDK
-LOCAL_LDFLAGS := $(OUT)/system/lib/libbcc.so
-
-LOCAL_LDFLAGS += -lm -llog -ljnigraphics
+LOCAL_LDLIBS := -lm -llog -ljnigraphics -lbcc
+LOCAL_LDFLAGS := -L$(OUT)/system/lib
 
 include $(BUILD_SHARED_LIBRARY)

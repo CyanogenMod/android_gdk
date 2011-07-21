@@ -280,7 +280,7 @@ BEGIN {
 #
 #          if (substr($0,1,2) == "=\"") {        # if $0 begins with ="
 #               _xml_value = substr($0,3);       # extract value
-#               sub(/".*$/,"",_xml_value);  
+#               sub(/".*$/,"",_xml_value);
 #               sub(/^="[^"]*"/,"",$0);          # remove it from $0
 #           } else if (substr($0,1,2) == "='") { # if $0 begins with ='
 #               _xml_value = substr($0,3);       # extract value

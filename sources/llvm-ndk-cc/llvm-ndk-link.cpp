@@ -121,13 +121,13 @@ int main(int argc, char** argv) {
   // No need to link (just one file).
   // Output Directly.
   if (InputFilenames.size() == 1) {
-    llvm::OwningPtr<llvm::Module> M(getModuleFromFilename(InputFilenames[0], 
-                                                           Ctx, 
+    llvm::OwningPtr<llvm::Module> M(getModuleFromFilename(InputFilenames[0],
+                                                           Ctx,
                                                            ErrMsg));
     llvm::WriteBitcodeToFile(M.get(), FOS);
     return 0;
   }
-  
+
   llvm::OwningPtr<llvm::Module> M(linkFilesToModule(InputFilenames, Ctx));
   llvm::WriteBitcodeToFile(M.get(), FOS);
   assert(!FOS.has_error());

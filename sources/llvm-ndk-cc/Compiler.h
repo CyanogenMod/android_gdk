@@ -49,10 +49,10 @@ public:
     OT_Bitcode,
     OT_Nothing,
     OT_Object,
-  
+
     OT_Default = OT_Bitcode
   } OutputType;
-  
+
   Compiler();
   ~Compiler();
 

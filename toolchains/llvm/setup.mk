@@ -14,13 +14,13 @@ TARGET_C_INCLUDES := $(GDK_PLATFORMS_ROOT)/android-portable/arch-llvm/usr/includ
 TARGET_C_INCLUDES += $(NDK_ROOT)/platforms/android-9/arch-arm/usr/include/ \
                      $(NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/lib/gcc/arm-linux-androideabi/4.4.3/include
 
-TARGET_CC       := clang
+TARGET_CC       := $(OUT)/../../../host/linux-x86/bin/clang
 TARGET_CFLAGS   := -ccc-host-triple armv7-none-linux-gnueabi -emit-llvm
 
-TARGET_CXX      := clang++
+TARGET_CXX      := $(OUT)/../../../host/linux-x86/bin/clang++
 TARGET_CXXFLAGS := $(TARGET_CFLAGS) -fno-exceptions -fno-rtti -D __cplusplus
 
-TARGET_LD       := llvm-link
+TARGET_LD       := $(OUT)/../../../host/linux-x86/bin/llvm-link
 TARGET_LDFLAGS  :=
 
 define cmd-link-bitcodes

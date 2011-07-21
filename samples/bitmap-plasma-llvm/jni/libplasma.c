@@ -92,7 +92,7 @@ static __inline__ Fixed  fixed_cos( Fixed  f )
 #define  PALETTE_SIZE   (1 << PALETTE_BITS)
 
 #if PALETTE_BITS > FIXED_BITS
-#  error PALETTE_BITS must be smaller than FIXED_BITS 
+#  error PALETTE_BITS must be smaller than FIXED_BITS
 #endif
 
 #if 0

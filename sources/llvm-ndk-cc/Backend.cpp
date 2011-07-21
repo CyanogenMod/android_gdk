@@ -240,7 +240,7 @@ void Backend::HandleTranslationUnit(clang::ASTContext &Ctx) {
          ++i) {
       if (llvm::CallInst* CallInst = llvm::dyn_cast<llvm::CallInst>(&*i)) {
         if (CallInst->isInlineAsm()) {
-          // TODO: Should we reflect source location information to diagnostic 
+          // TODO: Should we reflect source location information to diagnostic
           //       class and show to users?
           llvm::errs() << "Inline assembly is illigal. Please don't use it." << "\n";
           exit(1);

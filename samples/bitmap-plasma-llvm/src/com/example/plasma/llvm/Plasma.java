@@ -51,7 +51,7 @@ public class Plasma extends Activity
         inflater.inflate(R.menu.menu, menu);
         return true;
     }
-    
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
@@ -63,7 +63,7 @@ public class Plasma extends Activity
                 return super.onOptionsItemSelected(item);
         }
     }
-   
+
     private PlasmaView view;
 
     /* load our native library */
@@ -81,7 +81,7 @@ class PlasmaView extends View {
 
     private byte[] pgm;
     private int pgmLength;
-    
+
     private boolean mode = true;
     private Paint paint = null;
 
@@ -93,7 +93,7 @@ class PlasmaView extends View {
         super(context);
 
         mStartTime = System.currentTimeMillis();
-        
+
         InputStream is = null;
         is = getResources().openRawResource(R.raw.libplasma_portable);
         try {
@@ -131,7 +131,7 @@ class PlasmaView extends View {
         int frameRate = nativeRenderPlasma(mBitmap, System.currentTimeMillis() - mStartTime, pgm, pgmLength, mode);
         canvas.drawBitmap(mBitmap, 0, 0, null);
         canvas.drawText((mode ? "LLVM" : "GCC") + " Frame: " + Integer.toString(frameRate), 100, 100, paint);
-        
+
         // force a redraw, with a different time-based pattern.
         invalidate();
     }
