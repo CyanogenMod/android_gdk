@@ -11,7 +11,8 @@
 TARGET_C_INCLUDES := $(GDK_PLATFORMS_ROOT)/android-portable/arch-llvm/usr/include
 
 # Workaround before the required headers are in the above dir.
-TARGET_C_INCLUDES += $(NDK_ROOT)/platforms/android-9/arch-arm/usr/include/ \
+TARGET_C_INCLUDES += $(NDK_ROOT)/platforms/android-9/arch-arm/usr/include \
+                     $(NDK_ROOT)/sources/cxx-stl/system/include \
                      $(NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/lib/gcc/arm-linux-androideabi/4.4.3/include
 
 TARGET_CC       := $(OUT)/../../../host/linux-x86/bin/clang
