@@ -36,7 +36,7 @@ libportable_arch_src_files += arch-mips/mmap.c \
 endif
 
 LOCAL_SRC_FILES := \
-	$(libportable_common_src_files) \
+        $(libportable_common_src_files) \
         $(libportable_arch_src_files)
 
 include $(BUILD_SHARED_LIBRARY)

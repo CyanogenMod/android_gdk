@@ -1,4 +1,3 @@
-
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
@@ -8,10 +7,9 @@
 #define MAP_ANONYMOUS_PORTABLE 0x20
 #define PROT_SEM_PORTABLE 0x8
 
-extern void*  __mmap2(void*, size_t, int, int, int, size_t);
+extern void* __mmap2(void*, size_t, int, int, int, size_t);
 
-static inline int mips_change_prot(int prot)
-{
+static inline int mips_change_prot(int prot) {
     if (prot & PROT_SEM_PORTABLE) {
         prot &= ~PROT_SEM_PORTABLE;
         prot |= PROT_SEM;
@@ -20,8 +18,7 @@ static inline int mips_change_prot(int prot)
     return prot;
 }
 
-static inline int mips_change_flags(int flags)
-{
+static inline int mips_change_flags(int flags) {
     if (flags & MAP_ANONYMOUS_PORTABLE) {
         flags &= ~MAP_ANONYMOUS_PORTABLE;
         flags |= MAP_ANONYMOUS;
@@ -31,8 +28,7 @@ static inline int mips_change_flags(int flags)
 }
 
 #define  MMAP2_SHIFT  12
-void* mmap( void*  addr,  size_t  size, int  prot, int  flags, int  fd,  long  offset )
-{
+void* mmap(void* addr, size_t size, int prot, int flags, int fd, long offset) {
     if ( offset & ((1UL << MMAP2_SHIFT)-1) ) {
         errno = EINVAL;
         return MAP_FAILED;
