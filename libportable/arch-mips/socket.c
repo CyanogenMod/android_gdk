@@ -2,14 +2,18 @@
 #include <sys/socket.h>
 #include <sys/linux-syscalls.h>
 
-#if SOCK_STREAM==1
+#define SOCK_STREAM_PORTABLE 1
+#define SOCK_DGRAM_PORTABLE 2
+
+#if SOCK_STREAM==SOCK_STREAM_PORTABLE
 #error Bad build environment
 #endif
 
-static inline int mips_change_type(int type) {
+static inline int mips_change_type(int type)
+{
     switch (type) {
-      case SOCK_DGRAM: return 2;
-      case SOCK_STREAM: return 1;
+      case SOCK_DGRAM_PORTABLE: return SOCK_DGRAM;
+      case SOCK_STREAM_PORTABLE: return SOCK_STREAM;
     }
     return type;
 }
