@@ -32,7 +32,8 @@ ifeq ($(TARGET_ARCH),mips)
 libportable_arch_src_files += arch-mips/mmap.c \
                         arch-mips/stat.c \
                         arch-mips/open.c \
-                        arch-mips/socket.c
+                        arch-mips/socket.c \
+			arch-mips/sockopt.c
 endif
 
 LOCAL_SRC_FILES := \
@@ -40,4 +41,3 @@ LOCAL_SRC_FILES := \
         $(libportable_arch_src_files)
 
 include $(BUILD_SHARED_LIBRARY)
-
