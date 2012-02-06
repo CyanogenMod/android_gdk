@@ -43,7 +43,12 @@ __BEGIN_DECLS
 #define O_CLOEXEC  02000000
 #endif
 
+<<<<<<< current
 extern int  open(const char*  path, int  mode, ...);
+=======
+extern int  open_portable(const char*  path, int  mode, ...);
+#define open open_portable
+>>>>>>> patched
 extern int  openat(int fd, const char*  path, int  mode, ...);
 extern int  unlinkat(int dirfd, const char *pathname, int flags);
 extern int  fcntl(int   fd, int   command, ...);
