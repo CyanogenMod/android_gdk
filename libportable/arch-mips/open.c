@@ -102,7 +102,7 @@ static inline int mips_change_flags(int flags)
 }
 
 extern int  __open(const char*, int, int);
-int open_portable(const char *pathname, int flags, ...)
+int open(const char *pathname, int flags, ...)
 {
     mode_t  mode = 0;
     flags |= O_LARGEFILE;
