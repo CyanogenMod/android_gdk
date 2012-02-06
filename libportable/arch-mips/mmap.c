@@ -9,6 +9,10 @@
 
 extern void* __mmap2(void*, size_t, int, int, int, size_t);
 
+#if MAP_ANONYMOUS_PORTABLE==MAP_ANONYMOUS
+#error Bad build environment
+#endif
+
 static inline int mips_change_prot(int prot) {
     if (prot & PROT_SEM_PORTABLE) {
         prot &= ~PROT_SEM_PORTABLE;

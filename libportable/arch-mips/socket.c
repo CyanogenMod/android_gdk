@@ -2,6 +2,10 @@
 #include <sys/socket.h>
 #include <sys/linux-syscalls.h>
 
+#if SOCK_STREAM==1
+#error Bad build environment
+#endif
+
 static inline int mips_change_type(int type) {
     switch (type) {
       case SOCK_DGRAM: return 2;

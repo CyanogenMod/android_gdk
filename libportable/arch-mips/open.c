@@ -5,6 +5,10 @@
 extern int  __open(const char*, int, int);
 #define O_CREAT_PORTABLE 00000100
 
+#if O_CREAT_PORTABLE==O_CREAT
+#error Bad build environment
+#endif
+
 static inline int mips_change_flags(int flags) {
     if (flags & O_CREAT_PORTABLE) {
         flags &= ~O_CREAT_PORTABLE;
