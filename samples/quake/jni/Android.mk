@@ -34,10 +34,11 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS := -Werror \
 	-I$(OUT)/../../../../frameworks/compile/libbcc/include \
-	-I$(OUT)/../../../../system/media/wilhelm/include \
 	-I$(OUT)/../../../../dalvik/libnativehelper/include \
 	-I$(OUT)/../../../../frameworks/base/include \
 	-I$(OUT)/../../../../system/core/include
+
+LOCAL_C_INCLUDES := $(call include-path-for, wilhelm)
 
 LOCAL_LDLIBS := -llog -lutils -lEGL -lGLESv1_CM -lOpenSLES -lbcc
 LOCAL_LDFLAGS := -L$(OUT)/system/lib/

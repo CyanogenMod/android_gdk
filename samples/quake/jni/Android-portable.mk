@@ -64,10 +64,11 @@ LOCAL_SRC_FILES:= \
   zone.cpp
 
 LOCAL_CFLAGS := -fno-zero-initialized-in-bss \
-  -I$(OUT)/../../../../system/media/wilhelm/include \
   -I$(OUT)/../../../../dalvik/libnativehelper/include \
   -I$(OUT)/../../../../frameworks/base/include \
   -I$(OUT)/../../../../system/core/include
+
+LOCAL_C_INCLUDES := $(call include-path-for, wilhelm)
 
 
 include $(BUILD_BITCODE)
