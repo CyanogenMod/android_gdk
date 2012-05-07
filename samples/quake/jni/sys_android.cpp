@@ -39,6 +39,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <sys/wait.h>
 #include <sys/mman.h>
 #include <errno.h>
+int errno_portable();
 #include <dirent.h>
 
 #include <android/log.h>
@@ -63,6 +64,142 @@ static const char *basedir2 = "/data/quake";
 static const char *cachedir = "/tmp";
 
 cvar_t  sys_linerefresh = CVAR2("sys_linerefresh","0");// set for entity display
+
+
+//
+// system dependent 
+//    
+
+struct stat_portable {
+    unsigned long long st_dev;
+    unsigned char __pad0[4];
+
+    unsigned long __st_ino;  
+    unsigned int st_mode;
+    unsigned int st_nlink;
+
+    unsigned long st_uid;
+    unsigned long st_gid;
+
+    unsigned long long st_rdev;
+    unsigned char __pad3[4];
+
+    long long st_size;
+    unsigned long st_blksize;
+    unsigned long long st_blocks;
+
+    unsigned long st_atime;
+    unsigned long st_atime_nsec;
+
+    unsigned long st_mtime;
+    unsigned long st_mtime_nsec;
+
+    unsigned long st_ctime;
+    unsigned long st_ctime_nsec;
+
+    unsigned long long st_ino;
+};
+
+#if defined(__mips__)
+struct stat_mips {
+    unsigned long st_dev;
+    unsigned long __pad0[3];
+
+    unsigned long long st_ino;
+
+    unsigned int st_mode;
+    unsigned int st_nlink;
+
+    unsigned long st_uid;
+    unsigned long st_gid;
+
+    unsigned long st_rdev;
+    unsigned long __pad1[3];
+
+    long long st_size;
+
+    unsigned long st_atime;
+    unsigned long st_atime_nsec;
+
+    unsigned long st_mtime;
+    unsigned long st_mtime_nsec;
+
+    unsigned long st_ctime;
+    unsigned long st_ctime_nsec;
+
+    unsigned long st_blksize;
+    unsigned long __pad2;
+
+    unsigned long long st_blocks;
+};
+#endif  //__mips__
+
+int stat_portable(const char *path, struct stat_portable *st);
+int fstat_portable(int fd, struct stat_portable *st);
+
+
+#if !defined(__GDK__)
+
+#if defined(__mips__)
+static void __copy_mips_stat_to_portable(struct stat_portable *pst_portable, struct stat/*_mips*/ *pst_mips)
+{
+   pst_portable->st_dev = pst_mips->st_dev;  //ToDo: sizeof st_dev is different !
+   pst_portable->__st_ino = 0;             //ToDo: missing in mips!
+   pst_portable->st_mode = pst_mips->st_mode;
+   pst_portable->st_nlink = pst_mips->st_nlink;
+   pst_portable->st_uid = pst_mips->st_uid;
+   pst_portable->st_gid = pst_mips->st_gid;
+   pst_portable->st_rdev = pst_mips->st_rdev;  //ToDo: st_rdev is different !
+   pst_portable->st_size = pst_mips->st_size;
+   pst_portable->st_blksize = pst_mips->st_blksize;
+   pst_portable->st_blocks = pst_mips->st_blocks;
+   pst_portable->st_atime = pst_mips->st_atime;
+   pst_portable->st_atime_nsec = pst_mips->st_atime_nsec;
+   pst_portable->st_mtime = pst_mips->st_mtime;
+   pst_portable->st_mtime_nsec = pst_mips->st_mtime_nsec;
+   pst_portable->st_ctime = pst_mips->st_ctime;
+   pst_portable->st_ctime_nsec = pst_mips->st_ctime_nsec;
+   pst_portable->st_ino = pst_mips->st_ino; 
+}
+#endif // __mips__
+			
+int stat_portable(const char *path, struct stat_portable *st)
+{
+#if !defined(__mips__)
+   struct stat st_orig;
+   //assert(sizeof(st_orig) == sizeof(*st));   //ToDo: and offset of each field !
+   
+   return stat(path, (struct stat*)st);
+#else
+   struct stat/*_mips*/ st_mips;
+   //assert(sizeof(st_mips) == sizeof(*st));   //ToDo: and offset of each field !
+   
+   int ret = stat(path, &st_mips);
+   __copy_mips_stat_to_portable((struct stat_portable *)st, &st_mips);
+   
+   return ret;
+#endif   
+}
+
+int fstat_portable(int fd, struct stat_portable *st)
+{
+#if !defined(__mips__)
+   struct stat st_orig;
+   //assert(sizeof(st_orig) == sizeof(*st));   //ToDo: and offset of each field !
+   
+   return fstat(fd, (struct stat*)st);
+#else
+   struct stat/*_mips*/ st_mips;
+   //assert(sizeof(st_mips) == sizeof(*st));   //ToDo: and offset of each field !
+   
+   int ret = fstat(fd, &st_mips);
+   __copy_mips_stat_to_portable((struct stat_portable *)st, &st_mips);
+   
+   return ret;
+#endif   
+}
+
+#endif // !__GDK__
 
 // =======================================================================
 // General routines
@@ -220,9 +357,9 @@ returns -1 if not present
 */
 int	Sys_FileTime (const char *path)
 {
-  struct	stat	buf;
+  struct stat_portable buf;
 
-  if (stat (path,&buf) == -1)
+  if (stat_portable(path,&buf) == -1)
     return -1;
 
   return buf.st_mtime;
@@ -237,15 +374,14 @@ void Sys_mkdir (const char *path)
 int Sys_FileOpenRead (const char *path, int *handle)
 {
   int	h;
-  struct stat	fileinfo;
+  struct stat_portable fileinfo;
 
-
-  h = open (path, O_RDONLY, 0666);
+  h = open(path, O_RDONLY, 0666);
   *handle = h;
   if (h == -1)
     return -1;
 
-  if (fstat (h,&fileinfo) == -1)
+  if (fstat_portable(h,&fileinfo) == -1)
     Sys_Error ("Error fstating %s", path);
 
   return fileinfo.st_size;
@@ -261,7 +397,7 @@ int Sys_FileOpenWrite (const char *path)
   , 0666);
 
   if (handle == -1)
-    Sys_Error ("Error opening %s: %s", path,strerror(errno));
+    Sys_Error ("Error opening %s: %s", path,strerror(errno_portable()));
 
   return handle;
 }
@@ -401,15 +537,19 @@ extern int scr_height;
 
 qboolean direxists(const char* path)
 {
-  struct stat sb;
-  if(stat(path, &sb))
+  struct stat_portable sb;
+   
+  if(stat_portable(path, &sb))
   {
+LOGI("direxists 1: path=%s\n", path);
     return 0;	// error
   }
   if(sb.st_mode & S_IFDIR)
   {
+LOGI("direxists 2: path=%s\n", path);
      return 1;
   }
+LOGI("direxists 3: path=%s\n", path);
   return 0;
 }
 
@@ -488,7 +628,7 @@ void CheckGLCacheVersion(const char* baseDir)
       fwrite(&vernum, sizeof(vernum), 1, f);
       fclose(f);
     } else {
-        PMPLOG(("Could not write %s %d.\n", cachePath, errno));
+        PMPLOG(("Could not write %s %d.\n", cachePath, errno_portable()));
     }
   }
 }
@@ -505,7 +645,7 @@ static qboolean gDoubleInitializeGuard;
 static qboolean gInitialized;
 void GL_ReInit();
 
-#if !defined(__clang__)
+#if !defined(__GDK__)
 bool AndroidInit()
 #else
 extern "C" bool AndroidInit_LLVM()
@@ -665,7 +805,7 @@ int AndroidStepImp(int width, int height)
   return key_dest == key_game;
 }
 
-#if !defined(__clang__)
+#if !defined(__GDK__)
 int AndroidStep(int width, int height)
 #else
 extern "C" int AndroidStep_LLVM(int width, int height)
@@ -685,7 +825,7 @@ extern "C" int AndroidStep_LLVM(int width, int height)
 extern void Host_Quit();
 
 
-#if !defined(__clang__)
+#if !defined(__GDK__)
 void AndroidQuit() {
 #else
 extern "C" void AndroidQuit_LLVM() {

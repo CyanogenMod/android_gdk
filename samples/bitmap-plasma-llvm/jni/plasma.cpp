@@ -14,16 +14,22 @@
  * limitations under the License.
  */
 
-#include <jni.h>
-#include <time.h>
-#include <android/log.h>
-#include <android/bitmap.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
-#include "bcc/bcc.h"
+#if !defined(__GDK__) && !defined(__NOGDK__)
+#include <bcc/bcc.h>
+#include <dlfcn.h>
+#endif // !__GDK__ && !__NOGDK__
+
+#if !defined(__GDK__)
+#include <jni.h>
+#include <time.h>
+#include <android/bitmap.h>
+#endif // !__GDK__
+
+#include <android/log.h>
 
 #define  LOG_TAG    "libplasma"
 #define  LOGI(...)  __android_log_print(ANDROID_LOG_INFO,LOG_TAG,__VA_ARGS__)
@@ -35,13 +41,6 @@
 /* Set to 1 to optimize memory stores when generating plasma. */
 #define OPTIMIZE_WRITES  1
 
-/* Return current time in milliseconds */
-static double now_ms(void)
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec*1000. + tv.tv_usec/1000.;
-}
 
 /* We're going to perform computations for every pixel of the target
  * bitmap. floating-point operations are very slow on ARMv5, and not
@@ -98,7 +97,11 @@ typedef int32_t  Angle;
 #  define  ANGLE_TO_FIXED(x)       (Fixed)((x) >> (ANGLE_BITS - FIXED_BITS))
 #endif
 
+#if defined(__GDK__)
+static Fixed  *angle_sin_tab;
+#else
 static Fixed  angle_sin_tab[ANGLE_2PI+1];
+#endif // !__GDK__
 
 static void init_angles(void)
 {
@@ -171,7 +174,7 @@ static void init_palette(void)
     }
 }
 
-static __inline__ uint16_t  palette_from_fixed( Fixed  x )
+static __inline__ uint16_t  palette_from_fixed( uint16_t* palette, Fixed  x )
 {
     if (x < 0) x = -x;
     if (x >= FIXED_ONE) x = FIXED_ONE-1;
@@ -187,8 +190,13 @@ static void init_tables(void)
     init_angles();
 }
 
-static void fill_plasma( AndroidBitmapInfo*  info, void*  pixels, double  t )
+
+extern "C" void fill_plasma( 
+    uint32_t width, uint32_t height, uint32_t stride, double t, uint16_t* palette, void* pixels, Fixed *_angle_sin_tab )
 {
+  #if defined(__GDK__)
+    angle_sin_tab = _angle_sin_tab;
+  #endif // !__GDK__
     Fixed ft  = FIXED_FROM_FLOAT(t/1000.);
     Fixed yt1 = FIXED_FROM_FLOAT(t/1230.);
     Fixed yt2 = yt1;
@@ -199,7 +207,7 @@ static void fill_plasma( AndroidBitmapInfo*  info, void*  pixels, double  t )
 #define  YT2_INCR   FIXED_FROM_FLOAT(1/163.)
 
     int  yy;
-    for (yy = 0; yy < info->height; yy++) {
+    for (yy = 0; yy < height; yy++) {
         uint16_t*  line = (uint16_t*)pixels;
         Fixed      base = fixed_sin(yt1) + fixed_sin(yt2);
         Fixed      xt1 = xt10;
@@ -215,7 +223,7 @@ static void fill_plasma( AndroidBitmapInfo*  info, void*  pixels, double  t )
         /* optimize memory writes by generating one aligned 32-bit store
          * for every pair of pixels.
          */
-        uint16_t*  line_end = line + info->width;
+        uint16_t*  line_end = line + width;
 
         if (line < line_end) {
             if (((uint32_t)line & 3) != 0) {
@@ -224,7 +232,7 @@ static void fill_plasma( AndroidBitmapInfo*  info, void*  pixels, double  t )
                 xt1 += XT1_INCR;
                 xt2 += XT2_INCR;
 
-                line[0] = palette_from_fixed(ii >> 2);
+                line[0] = palette_from_fixed(palette, ii >> 2);
                 line++;
             }
 
@@ -237,8 +245,8 @@ static void fill_plasma( AndroidBitmapInfo*  info, void*  pixels, double  t )
                 xt1 += XT1_INCR;
                 xt2 += XT2_INCR;
 
-                uint32_t  pixel = ((uint32_t)palette_from_fixed(i1 >> 2) << 16) |
-                                   (uint32_t)palette_from_fixed(i2 >> 2);
+                uint32_t  pixel = ((uint32_t)palette_from_fixed(palette, i1 >> 2) << 16) |
+                                   (uint32_t)palette_from_fixed(palette, i2 >> 2);
 
                 ((uint32_t*)line)[0] = pixel;
                 line += 2;
@@ -246,26 +254,36 @@ static void fill_plasma( AndroidBitmapInfo*  info, void*  pixels, double  t )
 
             if (line < line_end) {
                 Fixed ii = base + fixed_sin(xt1) + fixed_sin(xt2);
-                line[0] = palette_from_fixed(ii >> 2);
+                line[0] = palette_from_fixed(palette, ii >> 2);
                 line++;
             }
         }
 #else /* !OPTIMIZE_WRITES */
         int xx;
-        for (xx = 0; xx < info->width; xx++) {
+        for (xx = 0; xx < width; xx++) {
 
             Fixed ii = base + fixed_sin(xt1) + fixed_sin(xt2);
 
             xt1 += XT1_INCR;
             xt2 += XT2_INCR;
 
-            line[xx] = palette_from_fixed(ii / 4);
+            line[xx] = palette_from_fixed(palette, ii / 4);
         }
 #endif /* !OPTIMIZE_WRITES */
 
         // go to next line
-        pixels = (char*)pixels + info->stride;
+        pixels = (char*)pixels + stride;
     }
+}
+
+#if !defined(__GDK__)
+
+/* Return current time in milliseconds */
+static double now_ms(void)
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec*1000. + tv.tv_usec/1000.;
 }
 
 /* simple stats management */
@@ -363,7 +381,23 @@ stats_endFrame( Stats*  s )
     s->lastTime = now;
 }
 
-typedef void (*pPlasmaType)(uint32_t, uint32_t, uint32_t, double, uint16_t*, void*, void*);
+typedef void (*pPlasmaType)(uint32_t, uint32_t, uint32_t, double, uint16_t*, void*, Fixed*);
+
+#if !defined(__GDK__) && !defined(__NOGDK__)
+static void* lookupSymbol(void* pContext, const char* name)
+{
+    return (void*) dlsym(RTLD_DEFAULT, name);
+}
+#endif // !__GDK__ && !__NOGDK__
+
+extern "C" JNIEXPORT jboolean JNICALL Java_com_example_plasma_llvm_PlasmaView_gdk(JNIEnv *env, jobject obj)
+{
+#if !defined(__NOGDK__)
+   return JNI_TRUE;
+#else
+   return JNI_FALSE;
+#endif
+}
 
 extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_nativeRenderPlasma
     (JNIEnv * env, jobject  obj,
@@ -376,6 +410,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
     static int         init;
     static double      time_sum = 0;
     static int         count = 0;
+#if !defined(__NOGDK__)
     static bool        last_mode = false;
     static pPlasmaType native_function = NULL;
     static BCCScriptRef script_ref;
@@ -383,7 +418,8 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
     if (last_mode != use_llvm)
       count = 0, time_sum = 0;
     last_mode = use_llvm;
-
+#endif // !__NOGDK__
+   
     if (!init) {
         init_tables();
         stats_init(&stats);
@@ -403,8 +439,8 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
     if ((ret = AndroidBitmap_lockPixels(env, bitmap, &pixels)) < 0) {
         LOGE("AndroidBitmap_lockPixels() failed ! error=%d", ret);
     }
-
-
+   
+#if !defined(__NOGDK__)
     if (use_llvm) {
       double start_jit = now_ms();
 
@@ -422,16 +458,28 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
           env->ReleasePrimitiveArrayCritical(scriptRef, script_ptr, 0);
         }
 
+     #if 0
         if (bccLinkFile(script_ref, "/system/lib/libclcore.bc", 0)) {
           LOGE("Error! Cannot bccLinkBC");
           return -1;
         }
-
+     #endif	 
+	 
+	bccRegisterSymbolCallback(script_ref, lookupSymbol, NULL);
+	 
+     #ifdef OLD_BCC 
+        if (bccPrepareExecutable(script_ref, "/data/data/com.example.plasma.llvm/plasmaLLVM.oBCC", 0)) {
+          LOGE("Error! Cannot bccPrepareExecutable");
+          return -1;
+        }
+     #else        	 
         if (bccPrepareExecutable(script_ref, "/data/data/com.example.plasma.llvm/", "plasmaLLVM", 0)) {
           LOGE("Error! Cannot bccPrepareExecutable");
           return -1;
         }
-        native_function = (pPlasmaType)bccGetFuncAddr(script_ref, "root");
+     #endif // OLD_BCC
+	 
+        native_function = (pPlasmaType)bccGetFuncAddr(script_ref, "fill_plasma");
         if (native_function == NULL) {
           LOGE("Error! Cannot find fill_plasma()");
           return -1;
@@ -441,13 +489,19 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
       double start_run = now_ms();
       native_function(info.width, info.height, info.stride, time_ms, palette, pixels, angle_sin_tab);
       double diff = now_ms()-start_run;
-      LOGI("LLVM Time JIT: %.2lf , Run: %.2lf, Avg: %.2lf", start_run-start_jit, diff, time_sum / count);
+      if (((count+1) % 30) == 0)
+          LOGI("LLVM Time JIT: %.2lf , Run: %.2lf, Avg: %.2lf, count=%d", start_run-start_jit, diff, time_sum / count, count+1);
       time_sum += diff + start_run - start_jit;
-    } else {
+    } 
+    else 
+#endif // !__NOGDK__
+
+    {
       double start_run = now_ms();
-      fill_plasma(&info, pixels, time_ms );
+      fill_plasma(info.width, info.height, info.stride, time_ms, palette, pixels, angle_sin_tab);
       double diff = now_ms()-start_run;
-      LOGI("GCC Time Run: %.2lf, Avg: %.2lf", diff, time_sum / count);
+      if (((count+1) % 30) == 0)
+          LOGI("GCC Time Run: %.2lf, Avg: %.2lf, count=%d", diff, time_sum / count, count+1);
       time_sum += diff;
     }
     count++;
@@ -456,3 +510,5 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
 
     return count * 1000.0 / time_sum;
 }
+
+#endif // !__GDK

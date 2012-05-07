@@ -51,40 +51,42 @@ public class QuakeActivity extends Activity {
         }
 
         if (foundQuakeData()) {
-          // HACK: create faked view in order to read bitcode in resource
+            byte[] pgm = null;
+            int pgmLength = 0;
+            if (QuakeLib.gdk())
+            {
+              // HACK: create faked view in order to read bitcode in resource
                 View view = new View(getApplication());
-                byte[] pgm;
-                int pgmLength;
 
-            // read bitcode in res
-            InputStream is = view.getResources().openRawResource(R.raw.libquake_portable);
-            try {
-               try {
-                  pgm = new byte[1024];
-                  pgmLength = 0;
+                // read bitcode in res
+                InputStream is = view.getResources().openRawResource(R.raw.libquake_portable);
+                try {
+                    try {
+                        pgm = new byte[1024];
+                        pgmLength = 0;
 
-                  while(true) {
-                     int bytesLeft = pgm.length - pgmLength;
-                     if (bytesLeft == 0) {
-                         byte[] buf2 = new byte[pgm.length * 2];
-                         System.arraycopy(pgm, 0, buf2, 0, pgm.length);
-                         pgm = buf2;
-                         bytesLeft = pgm.length - pgmLength;
+                        while(true) {
+                            int bytesLeft = pgm.length - pgmLength;
+                            if (bytesLeft == 0) {
+                                byte[] buf2 = new byte[pgm.length * 2];
+                                System.arraycopy(pgm, 0, buf2, 0, pgm.length);
+                                pgm = buf2;
+                                bytesLeft = pgm.length - pgmLength;
+                            }
+                            int bytesRead = is.read(pgm, pgmLength, bytesLeft);
+                            if (bytesRead <= 0) {
+                               break;
+                            }
+                            pgmLength += bytesRead;
+                        }
+                    } finally {
+                         is.close();
                      }
-                     int bytesRead = is.read(pgm, pgmLength, bytesLeft);
-                     if (bytesRead <= 0) {
-                        break;
-                     }
-                     pgmLength += bytesRead;
-    	          }
-               } finally {
-                  is.close();
-               }
-            } catch(IOException e) {
-               throw new Resources.NotFoundException();
-            }
-
-          //
+                } catch(IOException e) {
+                    throw new Resources.NotFoundException();
+                }
+	    }
+         //
             if (mQuakeLib == null) {
                 mQuakeLib = new QuakeLib(pgm, pgmLength);
                 if(! mQuakeLib.init()) {

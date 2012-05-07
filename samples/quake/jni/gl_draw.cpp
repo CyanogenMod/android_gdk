@@ -116,6 +116,7 @@ int			numgltextures;
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <errno.h>
+int errno_portable();
 
 // Allow named textures to be evicted from memory.
 
@@ -288,25 +289,25 @@ private:
         mFileId = open(fullpath, O_RDWR | O_CREAT, 0666);
         if ( mFileId == -1 ) {
             Sys_Error("Could not open texture store file %s: %d", fullpath,
-                    errno);
+                    errno_portable());
         }
 
         if (-1 == lseek(mFileId, TEXTURE_STORE_SIZE-1, SEEK_SET)) {
             Sys_Error("Could not extend the texture store file size. %d",
-                    errno);
+                    errno_portable());
         }
         char end;
         end = 0;
         if (-1 == write(mFileId, &end, 1)) {
             Sys_Error("Could not write last byte of the texture store file. %d",
-                    errno);
+                    errno_portable());
         }
 
         mBase = (byte*) mmap((caddr_t)0, TEXTURE_STORE_SIZE,
                 PROT_READ | PROT_WRITE, MAP_PRIVATE, mFileId, 0);
 
         if (mBase == (byte*) -1) {
-            Sys_Error("Could not mmap file %s: %d", fullpath, errno);
+            Sys_Error("Could not mmap file %s: %d", fullpath, errno_portable());
         }
         mLength = 0;
         mCapacity = TEXTURE_STORE_SIZE;

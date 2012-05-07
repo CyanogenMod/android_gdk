@@ -136,11 +136,13 @@ public class QuakeLib {
      static {
          System.loadLibrary("quake");
      }
-
+   
      public QuakeLib(byte[] pgm, int pgmLength) {
-         compile_bc(pgm, pgmLength);
+	 if (gdk())
+            compile_bc(pgm, pgmLength);
      }
 
+     public static native boolean gdk();
      private native boolean compile_bc(byte[] pgm, int pgmLength);
 
      public native boolean init();

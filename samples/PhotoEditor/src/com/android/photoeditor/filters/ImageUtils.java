@@ -29,6 +29,7 @@ public class ImageUtils {
         System.loadLibrary("jni_photoeditor");
     }
   
+    public static native boolean gdk();
     public static native boolean init(byte[] pgm, int pgmLength);
    
     public static native void nativeBacklight(Bitmap src, Bitmap dst, float backlight);

@@ -77,49 +77,56 @@ class PlasmaView extends View {
     private long mStartTime;
 
     /* implementend by libplasma.so */
+    private static native boolean gdk();
     private static native int nativeRenderPlasma(Bitmap  bitmap, long time_ms, byte[] script, int scriptLength, boolean useLLVM);
 
     private byte[] pgm;
     private int pgmLength;
 
-    private boolean mode = true;
+    private boolean llvm_mode = false;
     private Paint paint = null;
 
     public void switchMode() {
-        mode = !mode;
+        if (gdk())
+            llvm_mode = !llvm_mode;
     }
 
     public PlasmaView(Context context) {
         super(context);
+       
+        llvm_mode = gdk();
 
         mStartTime = System.currentTimeMillis();
-
-        InputStream is = null;
-        is = getResources().openRawResource(R.raw.libplasma_portable);
-        try {
+        if (llvm_mode)
+        {
+            InputStream is = null;
+            is = getResources().openRawResource(R.raw.libplasma_portable);
             try {
-                pgm = new byte[1024];
-                pgmLength = 0;
-                while(true) {
-                    int bytesLeft = pgm.length - pgmLength;
-                    if (bytesLeft == 0) {
-                        byte[] buf2 = new byte[pgm.length * 2];
-                        System.arraycopy(pgm, 0, buf2, 0, pgm.length);
-                        pgm = buf2;
-                        bytesLeft = pgm.length - pgmLength;
+                try {
+                    pgm = new byte[1024];
+                    pgmLength = 0;
+                    while(true) {
+                        int bytesLeft = pgm.length - pgmLength;
+                        if (bytesLeft == 0) {
+                            byte[] buf2 = new byte[pgm.length * 2];
+                            System.arraycopy(pgm, 0, buf2, 0, pgm.length);
+                            pgm = buf2;
+                            bytesLeft = pgm.length - pgmLength;
+                        }
+                        int bytesRead = is.read(pgm, pgmLength, bytesLeft);
+                        if (bytesRead <= 0) {
+                            break;
+                        }
+                        pgmLength += bytesRead;
                     }
-                    int bytesRead = is.read(pgm, pgmLength, bytesLeft);
-                    if (bytesRead <= 0) {
-                        break;
-                    }
-                    pgmLength += bytesRead;
+                } finally {
+                    is.close();
                 }
-            } finally {
-                is.close();
+            } catch(IOException e) {
+                throw new Resources.NotFoundException();
             }
-        } catch(IOException e) {
-            throw new Resources.NotFoundException();
-        }
+	}
+       
         paint = new Paint();
         paint.setTextSize(40);
     }
@@ -128,9 +135,9 @@ class PlasmaView extends View {
         if (mBitmap == null || mBitmap.getWidth() != getWidth() || mBitmap.getHeight() != getHeight())
             mBitmap = Bitmap.createBitmap(getWidth(), getHeight(), Bitmap.Config.RGB_565);
 
-        int frameRate = nativeRenderPlasma(mBitmap, System.currentTimeMillis() - mStartTime, pgm, pgmLength, mode);
+        int frameRate = nativeRenderPlasma(mBitmap, System.currentTimeMillis() - mStartTime, pgm, pgmLength, llvm_mode);
         canvas.drawBitmap(mBitmap, 0, 0, null);
-        canvas.drawText((mode ? "LLVM" : "GCC") + " Frame: " + Integer.toString(frameRate), 100, 100, paint);
+        canvas.drawText((llvm_mode ? "LLVM/GDK" : "Native") + " Frame: " + Integer.toString(frameRate), 100, 100, paint);
 
         // force a redraw, with a different time-based pattern.
         invalidate();

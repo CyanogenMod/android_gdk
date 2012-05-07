@@ -41,6 +41,8 @@ public class PhotoEditor extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
+       
+        if (ImageUtils.gdk())
 	{
           // HACK: create faked view in order to read bitcode in resource
                 View view = new View(getApplication());

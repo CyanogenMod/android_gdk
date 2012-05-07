@@ -19,7 +19,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // snd_dma.c -- main control for any streaming sound output device
 
+#include <android/log.h>
 #include "quakedef.h"
+
+#define LOG_TAG "Quake snd_dma"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
 
 #ifdef _WIN32
 #include "winquake.h"
@@ -144,7 +150,6 @@ void S_Startup (void)
 	if (!fakedma)
 	{
 		rc = SNDDMA_Init();
-
 		if (!rc)
 		{
 #ifndef	_WIN32
@@ -198,8 +203,6 @@ void S_Init (void)
 		Cvar_Set ("loadas8bit", "1");
 		Con_Printf ("loading all sounds as 8bit\n");
 	}
-
-
 
 	snd_initialized = true;
 

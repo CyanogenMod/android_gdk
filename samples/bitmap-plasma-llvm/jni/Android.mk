@@ -6,7 +6,7 @@ LOCAL_MODULE    := libplasma
 
 LOCAL_MODULE_TAGS := optional
 
-LOCAL_SRC_FILES := plasmaLLVM.cpp
+LOCAL_SRC_FILES := plasma.cpp
 
 LOCAL_C_INCLUDES := $(OUT)/../../../../frameworks/compile/libbcc/include
 

@@ -41,8 +41,7 @@ ifeq ($(TARGET_ARCH), arm)
 endif
 
 LOCAL_CFLAGS := -Werror \
-    -I$(OUT)/../../../../frameworks/compile/libbcc/include \
-    -I$(OUT)/../../../../dalvik/libnativehelper/include 
+    -I$(OUT)/../../../../frameworks/compile/libbcc/include 
 
 LOCAL_LDFLAGS := -L$(OUT)/system/lib
 

@@ -490,7 +490,7 @@ int AndroidEvent(int type, int value)
 // Called from Java to process an event.
 // Return non-zero if the event is handled.
 
-#if !defined(__clang__)
+#if !defined(__GDK__)
 int AndroidEvent2(int type, int value)
 #else
 extern "C" int AndroidEvent2_LLVM(int type, int value)
@@ -660,7 +660,7 @@ private:
 
 GestureDetector gGestureDetector;
 
-#if !defined(__clang__)
+#if !defined(__GDK__)
 int AndroidMotionEvent
 #else
 extern "C" int AndroidMotionEvent_LLVM
@@ -681,7 +681,7 @@ extern "C" int AndroidMotionEvent_LLVM
     return true;
 }
 
-#if !defined(__clang__)
+#if !defined(__GDK__)
 int AndroidTrackballEvent
 #else
 extern "C" int AndroidTrackballEvent_LLVM

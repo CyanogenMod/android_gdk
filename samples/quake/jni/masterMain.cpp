@@ -15,22 +15,23 @@
 ** limitations under the License.
 */
 
-#include <nativehelper/jni.h>
+#include <jni.h>
 #include <stdio.h>
 #include <assert.h>
-#include <dlfcn.h>
 
-#if !defined(__clang__)
+#if !defined(__GDK__)
 #include <bcc/bcc.h>
+#include <dlfcn.h>
 #endif
 
 #include <android/log.h>
+#include "sys.h"
 
 #define LOG_TAG "Quake masterMain"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-#if !defined(__clang__)
+#if !defined(__GDK__)
 int AndroidInit();
 int AndroidEvent2(int type, int value);
 int AndroidMotionEvent(unsigned long long eventTime, int action, float x, float y, float pressure, float size, int deviceId);
@@ -91,14 +92,27 @@ qquit(JNIEnv *env, jobject thiz) {
     return pAndroidQuit();
 }
 
+jboolean 
+gdk(JNIEnv *env, jobject obj)
+{
+#if !defined(__NOGDK__)
+   return JNI_TRUE;
+#else
+   return JNI_FALSE;
+#endif
+}
+
+#if !defined(__GDK__) && !defined(__NOGDK__)
 static void* lookupSymbol(void* pContext, const char* name)
 {
     return (void*) dlsym(RTLD_DEFAULT, name);
 }
+#endif // !__GDK__ && !__NOGDK__
 
 jboolean
 qcompile_bc(JNIEnv *env, jobject thiz, jbyteArray scriptRef, jint length)
 {
+#if !defined(__GDK__) && !defined(__NOGDK__)
     if (!use_llvm)
        return JNI_TRUE;
 
@@ -109,6 +123,8 @@ qcompile_bc(JNIEnv *env, jobject thiz, jbyteArray scriptRef, jint length)
     pAndroidStepType new_pAndroidStep;
     pAndroidQuitType new_pAndroidQuit;
     int all_func_found = 1;
+
+    double time = Sys_FloatTime ();
 
     BCCScriptRef script_ref = bccCreateScript();
     jbyte* script_ptr = (jbyte *)env->GetPrimitiveArrayCritical(scriptRef, (jboolean *)0);
@@ -126,11 +142,28 @@ qcompile_bc(JNIEnv *env, jobject thiz, jbyteArray scriptRef, jint length)
         return JNI_FALSE;
     }
   #endif
+
+    double newtime = Sys_FloatTime ();
+    double readtime = newtime - time;
+    time = newtime;
+
     bccRegisterSymbolCallback(script_ref, lookupSymbol, NULL);
-    if (bccPrepareExecutableEx(script_ref, ".", "/data/data/com.android.quake.llvm/quakeLLVM", 0)) {
-        LOGE("Error! Cannot bccPrepareExecutableEx");
+   
+ #ifdef OLD_BCC
+    if (bccPrepareExecutable(script_ref, "/data/data/com.android.quake.llvm/quakeLLVM.oBCC", 0)) {
+        LOGE("Error! Cannot bccPrepareExecutable");
         return JNI_FALSE;
     }
+ #else  
+    if (bccPrepareExecutable(script_ref, "/data/data/com.android.quake.llvm/", "quakeLLVM", 0)) {
+        LOGE("Error! Cannot bccPrepareExecutable");
+        return JNI_FALSE;
+    }
+ #endif // OLD_BCC
+
+    newtime = Sys_FloatTime ();
+    double compiletime = newtime - time;
+    time = newtime;
 
     new_pAndroidInit = (pAndroidInitType)bccGetFuncAddr(script_ref, "AndroidInit_LLVM");
     if (new_pAndroidInit == NULL) {
@@ -182,7 +215,6 @@ qcompile_bc(JNIEnv *env, jobject thiz, jbyteArray scriptRef, jint length)
 
     //bccDisposeScript(script_ref);
 
-  //Uncomment the following
     if (all_func_found)
     {
         LOGI("Use LLVM version");
@@ -193,14 +225,25 @@ qcompile_bc(JNIEnv *env, jobject thiz, jbyteArray scriptRef, jint length)
         pAndroidStep = new_pAndroidStep;
         pAndroidQuit = new_pAndroidQuit;
     }
+    newtime = Sys_FloatTime ();
+    double findptrtime = newtime - time;
+    
+    LOGI("LLVM JIT time = %lf (%lf + %lf + %lf)\n", readtime+compiletime+findptrtime, 
+	   readtime, compiletime, findptrtime);
 
     return JNI_TRUE;
+#else
+   
+    return JNI_FALSE;
+   
+#endif // !__GDK__ && !__NOGDK__
 }
 
 
 static const char *classPathName = "com/android/quake/llvm/QuakeLib";
 
 static JNINativeMethod methods[] = {
+  {"gdk", "()Z", (void*)gdk },
   {"compile_bc", "([BI)Z", (void*)qcompile_bc },
   {"init", "()Z", (void*)qinit },
   {"event", "(II)Z", (void*)qevent },
@@ -293,4 +336,4 @@ bail:
 }
 
 
-#endif // __clang__
+#endif // __GDK__

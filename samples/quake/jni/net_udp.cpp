@@ -51,6 +51,7 @@ static unsigned long myAddr;
 
 #include "net_udp.h"
 
+
 // **** Start of Android-specific code ****
 // copied from ifc_utils.c
 //
@@ -61,14 +62,109 @@ static unsigned long myAddr;
 #include <sys/ioctl.h>
 #include <net/if.h>
 
+//
+// system dependent 
+//
+
+#define SOCK_DGRAM_PORTABLE    2
+#define SOCK_STREAM_PORTABLE   1
+#define FIONBIO_PORTABLE       0x5421
+#define FIONREAD_PORTABLE      0x541B
+#define ECONNREFUSED_PORTABLE  111
+#define SOL_SOCKET_PORTABLE     1 
+#define SO_BROADCAST_PORTABLE   6 
+
+#define SOCK_DGRAM_MIPS    1
+#define SOCK_STREAM_MIPS   2
+#define FIONBIO_MIPS       0x667e
+#define FIONREAD_MIPS      0x467f
+#define ECONNREFUSED_MIPS  146
+#define SOL_SOCKET_MIPS     0xffff 
+#define SO_BROADCAST_MIPS   0x0020
+
+
+int socket_portable(int domain, int type, int protocol);
+int ioctl_portable(int fd, int cmd, void *);  // ToDo: ioctl_portable(int fd, int cmd, ...)
+int setsockopt_portable(int s, int level, int optname, const void *optval, socklen_t optlen);
+int errno_portable();
+
+
+#if !defined(__GDK__)
+int socket_portable(int domain, int type, int protocol)
+{
+#if defined(__mips__) 
+   switch(type) {
+   case SOCK_DGRAM_PORTABLE: 
+      type = SOCK_DGRAM_MIPS; 
+      break;
+   case SOCK_STREAM_PORTABLE:
+      type = SOCK_STREAM_MIPS; 
+      break;
+   }
+#endif // __mips__
+   return socket(domain, type, protocol);
+}
+
+int ioctl_portable(int fd, int cmd, void *arg)
+{
+#if defined(__mips__)
+   switch(cmd) {
+    case FIONBIO_PORTABLE:
+      cmd = FIONBIO_MIPS; 
+      break;
+    case FIONREAD_PORTABLE:
+      cmd = FIONREAD_MIPS;
+    //ToDo: there are a lot more diff!  
+   }
+#endif // __mips__
+   return ioctl(fd, cmd, arg);
+}
+   
+int errno_portable()
+{
+   int ret = errno;
+#if defined(__mips__)
+   switch(ret) {
+   case ECONNREFUSED_PORTABLE: 
+      ret = ECONNREFUSED_MIPS;
+      break;
+     //ToDo: there are a lot more diff!
+   }
+#endif // __mips__   
+   return ret;
+}
+   
+int setsockopt_portable(int s, int level, int optname, const void *optval, socklen_t optlen)
+{
+#if defined(__mips__)
+   switch(level) {
+   case SOL_SOCKET_PORTABLE: 
+      level = SOL_SOCKET_MIPS;
+      break;
+     //ToDo: there are a lot more diff!
+   }
+   
+   switch(optname) {
+   case SO_BROADCAST_PORTABLE: 
+      optname = SO_BROADCAST_MIPS;
+      break;
+     //ToDo: there are a lot more diff!
+   }
+#endif   
+   return setsockopt(s, level, optname, optval, optlen);
+}
+
+#endif // !__GDK__
+
+
 static int ifc_ctl_sock = -1;
 
 int ifc_init(void)
 {
     if (ifc_ctl_sock == -1) {
-        ifc_ctl_sock = socket(AF_INET, SOCK_DGRAM, 0);
+        ifc_ctl_sock = socket_portable(AF_INET, SOCK_DGRAM_PORTABLE, 0);
         if (ifc_ctl_sock < 0) {
-        	Con_Printf("socket() failed: %s\n", strerror(errno));
+        	Con_Printf("socket() failed: %s\n", strerror(errno_portable()));
         }
     }
     return ifc_ctl_sock < 0 ? -1 : 0;
@@ -95,7 +191,7 @@ int ifc_get_info(const char *name, in_addr_t *addr, in_addr_t *mask, unsigned *f
     ifc_init_ifr(name, &ifr);
 
     if (addr != NULL) {
-        if(ioctl(ifc_ctl_sock, SIOCGIFADDR, &ifr) < 0) {
+        if(ioctl_portable(ifc_ctl_sock, SIOCGIFADDR, &ifr) < 0) {
             *addr = 0;
         } else {
             *addr = ((struct sockaddr_in*) (void*) &ifr.ifr_addr)->sin_addr.s_addr;
@@ -103,7 +199,7 @@ int ifc_get_info(const char *name, in_addr_t *addr, in_addr_t *mask, unsigned *f
     }
 
     if (mask != NULL) {
-        if(ioctl(ifc_ctl_sock, SIOCGIFNETMASK, &ifr) < 0) {
+        if(ioctl_portable(ifc_ctl_sock, SIOCGIFNETMASK, &ifr) < 0) {
             *mask = 0;
         } else {
             *mask = ((struct sockaddr_in*) (void*) &ifr.ifr_addr)->sin_addr.s_addr;
@@ -111,7 +207,7 @@ int ifc_get_info(const char *name, in_addr_t *addr, in_addr_t *mask, unsigned *f
     }
 
     if (flags != NULL) {
-        if(ioctl(ifc_ctl_sock, SIOCGIFFLAGS, &ifr) < 0) {
+        if(ioctl_portable(ifc_ctl_sock, SIOCGIFFLAGS, &ifr) < 0) {
             *flags = 0;
         } else {
             *flags = ifr.ifr_flags;
@@ -233,10 +329,10 @@ int UDP_OpenSocket (int port)
 	} address;
 	qboolean _true = true;
 
-	if ((newsocket = socket (PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+	if ((newsocket = socket_portable(PF_INET, SOCK_DGRAM_PORTABLE, IPPROTO_UDP)) == -1)
 		return -1;
 
-	if (ioctl (newsocket, FIONBIO, (char *)&_true) == -1)
+	if (ioctl_portable(newsocket, FIONBIO_PORTABLE, (char *)&_true) == -1)
 		goto ErrorReturn;
 
 	address.in.sin_family = AF_INET;
@@ -335,7 +431,7 @@ int UDP_CheckNewConnections (void)
 	if (net_acceptsocket == -1)
 		return -1;
 
-	if (ioctl (net_acceptsocket, FIONREAD, &available) == -1)
+	if (ioctl_portable(net_acceptsocket, FIONREAD_PORTABLE, &available) == -1)
 		Sys_Error ("UDP: ioctlsocket (FIONREAD) failed\n");
 	if (available)
 		return net_acceptsocket;
@@ -350,7 +446,7 @@ int UDP_Read (int socket, byte *buf, int len, struct qsockaddr *addr)
 	int ret;
 
 	ret = recvfrom (socket, buf, len, 0, (struct sockaddr *)addr, (socklen_t*) &addrlen);
-	if (ret == -1 && (errno == EWOULDBLOCK || errno == ECONNREFUSED))
+	if (ret == -1 && (errno_portable() == EWOULDBLOCK || errno_portable() == ECONNREFUSED_PORTABLE))
 		return 0;
 	return ret;
 }
@@ -362,7 +458,7 @@ int UDP_MakeSocketBroadcastCapable (int socket)
 	int				i = 1;
 
 	// make this socket broadcast capable
-	if (setsockopt(socket, SOL_SOCKET, SO_BROADCAST, (char *)&i, sizeof(i)) < 0)
+	if (setsockopt_portable(socket, SOL_SOCKET_PORTABLE, SO_BROADCAST_PORTABLE, (char *)&i, sizeof(i)) < 0)
 		return -1;
 	net_broadcastsocket = socket;
 
@@ -397,7 +493,7 @@ int UDP_Write (int socket, byte *buf, int len, struct qsockaddr *addr)
 	int ret;
 
 	ret = sendto (socket, buf, len, 0, (struct sockaddr *)addr, sizeof(struct qsockaddr));
-	if (ret == -1 && errno == EWOULDBLOCK)
+	if (ret == -1 && errno_portable() == EWOULDBLOCK)
 		return 0;
 	return ret;
 }

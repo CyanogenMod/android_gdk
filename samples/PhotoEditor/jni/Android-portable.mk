@@ -40,6 +40,8 @@ ifeq ($(TARGET_ARCH), arm)
     LOCAL_SDK_VERSION := 9
 endif
 
+LOCAL_CFLAGS := -D__GDK__
+
 LOCAL_C_INCLUDES := $(OUT)/../../../../frameworks/compile/libbcc/include
 #LOCAL_LDFLAGS := -L$(OUT)/system/lib
 
