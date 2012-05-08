@@ -63,7 +63,7 @@ static unsigned long myAddr;
 #include <net/if.h>
 
 //
-// system dependent 
+// system dependent
 //
 
 #define SOCK_DGRAM_PORTABLE    2
@@ -71,15 +71,15 @@ static unsigned long myAddr;
 #define FIONBIO_PORTABLE       0x5421
 #define FIONREAD_PORTABLE      0x541B
 #define ECONNREFUSED_PORTABLE  111
-#define SOL_SOCKET_PORTABLE     1 
-#define SO_BROADCAST_PORTABLE   6 
+#define SOL_SOCKET_PORTABLE     1
+#define SO_BROADCAST_PORTABLE   6
 
 #define SOCK_DGRAM_MIPS    1
 #define SOCK_STREAM_MIPS   2
 #define FIONBIO_MIPS       0x667e
 #define FIONREAD_MIPS      0x467f
 #define ECONNREFUSED_MIPS  146
-#define SOL_SOCKET_MIPS     0xffff 
+#define SOL_SOCKET_MIPS     0xffff
 #define SO_BROADCAST_MIPS   0x0020
 
 
@@ -92,13 +92,13 @@ int errno_portable();
 #if !defined(__GDK__)
 int socket_portable(int domain, int type, int protocol)
 {
-#if defined(__mips__) 
+#if defined(__mips__)
    switch(type) {
-   case SOCK_DGRAM_PORTABLE: 
-      type = SOCK_DGRAM_MIPS; 
+   case SOCK_DGRAM_PORTABLE:
+      type = SOCK_DGRAM_MIPS;
       break;
    case SOCK_STREAM_PORTABLE:
-      type = SOCK_STREAM_MIPS; 
+      type = SOCK_STREAM_MIPS;
       break;
    }
 #endif // __mips__
@@ -110,47 +110,47 @@ int ioctl_portable(int fd, int cmd, void *arg)
 #if defined(__mips__)
    switch(cmd) {
     case FIONBIO_PORTABLE:
-      cmd = FIONBIO_MIPS; 
+      cmd = FIONBIO_MIPS;
       break;
     case FIONREAD_PORTABLE:
       cmd = FIONREAD_MIPS;
-    //ToDo: there are a lot more diff!  
+    //ToDo: there are a lot more diff!
    }
 #endif // __mips__
    return ioctl(fd, cmd, arg);
 }
-   
+
 int errno_portable()
 {
    int ret = errno;
 #if defined(__mips__)
    switch(ret) {
-   case ECONNREFUSED_PORTABLE: 
+   case ECONNREFUSED_PORTABLE:
       ret = ECONNREFUSED_MIPS;
       break;
      //ToDo: there are a lot more diff!
    }
-#endif // __mips__   
+#endif // __mips__
    return ret;
 }
-   
+
 int setsockopt_portable(int s, int level, int optname, const void *optval, socklen_t optlen)
 {
 #if defined(__mips__)
    switch(level) {
-   case SOL_SOCKET_PORTABLE: 
+   case SOL_SOCKET_PORTABLE:
       level = SOL_SOCKET_MIPS;
       break;
      //ToDo: there are a lot more diff!
    }
-   
+
    switch(optname) {
-   case SO_BROADCAST_PORTABLE: 
+   case SO_BROADCAST_PORTABLE:
       optname = SO_BROADCAST_MIPS;
       break;
      //ToDo: there are a lot more diff!
    }
-#endif   
+#endif
    return setsockopt(s, level, optname, optval, optlen);
 }
 

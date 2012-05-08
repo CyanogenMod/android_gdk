@@ -67,14 +67,14 @@ cvar_t  sys_linerefresh = CVAR2("sys_linerefresh","0");// set for entity display
 
 
 //
-// system dependent 
-//    
+// system dependent
+//
 
 struct stat_portable {
     unsigned long long st_dev;
     unsigned char __pad0[4];
 
-    unsigned long __st_ino;  
+    unsigned long __st_ino;
     unsigned int st_mode;
     unsigned int st_nlink;
 
@@ -159,26 +159,26 @@ static void __copy_mips_stat_to_portable(struct stat_portable *pst_portable, str
    pst_portable->st_mtime_nsec = pst_mips->st_mtime_nsec;
    pst_portable->st_ctime = pst_mips->st_ctime;
    pst_portable->st_ctime_nsec = pst_mips->st_ctime_nsec;
-   pst_portable->st_ino = pst_mips->st_ino; 
+   pst_portable->st_ino = pst_mips->st_ino;
 }
 #endif // __mips__
-			
+
 int stat_portable(const char *path, struct stat_portable *st)
 {
 #if !defined(__mips__)
    struct stat st_orig;
    //assert(sizeof(st_orig) == sizeof(*st));   //ToDo: and offset of each field !
-   
+
    return stat(path, (struct stat*)st);
 #else
    struct stat/*_mips*/ st_mips;
    //assert(sizeof(st_mips) == sizeof(*st));   //ToDo: and offset of each field !
-   
+
    int ret = stat(path, &st_mips);
    __copy_mips_stat_to_portable((struct stat_portable *)st, &st_mips);
-   
+
    return ret;
-#endif   
+#endif
 }
 
 int fstat_portable(int fd, struct stat_portable *st)
@@ -186,17 +186,17 @@ int fstat_portable(int fd, struct stat_portable *st)
 #if !defined(__mips__)
    struct stat st_orig;
    //assert(sizeof(st_orig) == sizeof(*st));   //ToDo: and offset of each field !
-   
+
    return fstat(fd, (struct stat*)st);
 #else
    struct stat/*_mips*/ st_mips;
    //assert(sizeof(st_mips) == sizeof(*st));   //ToDo: and offset of each field !
-   
+
    int ret = fstat(fd, &st_mips);
    __copy_mips_stat_to_portable((struct stat_portable *)st, &st_mips);
-   
+
    return ret;
-#endif   
+#endif
 }
 
 #endif // !__GDK__

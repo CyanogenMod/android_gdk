@@ -93,7 +93,7 @@ class PlasmaView extends View {
 
     public PlasmaView(Context context) {
         super(context);
-       
+
         llvm_mode = gdk();
 
         mStartTime = System.currentTimeMillis();
@@ -125,8 +125,8 @@ class PlasmaView extends View {
             } catch(IOException e) {
                 throw new Resources.NotFoundException();
             }
-	}
-       
+        }
+
         paint = new Paint();
         paint.setTextSize(40);
     }

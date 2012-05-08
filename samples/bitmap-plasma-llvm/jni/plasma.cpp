@@ -419,7 +419,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
       count = 0, time_sum = 0;
     last_mode = use_llvm;
 #endif // !__NOGDK__
-   
+
     if (!init) {
         init_tables();
         stats_init(&stats);
@@ -439,7 +439,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
     if ((ret = AndroidBitmap_lockPixels(env, bitmap, &pixels)) < 0) {
         LOGE("AndroidBitmap_lockPixels() failed ! error=%d", ret);
     }
-   
+
 #if !defined(__NOGDK__)
     if (use_llvm) {
       double start_jit = now_ms();
@@ -463,22 +463,22 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
           LOGE("Error! Cannot bccLinkBC");
           return -1;
         }
-     #endif	 
-	 
-	bccRegisterSymbolCallback(script_ref, lookupSymbol, NULL);
-	 
-     #ifdef OLD_BCC 
+     #endif
+
+        bccRegisterSymbolCallback(script_ref, lookupSymbol, NULL);
+
+     #ifdef OLD_BCC
         if (bccPrepareExecutable(script_ref, "/data/data/com.example.plasma.llvm/plasmaLLVM.oBCC", 0)) {
           LOGE("Error! Cannot bccPrepareExecutable");
           return -1;
         }
-     #else        	 
+     #else
         if (bccPrepareExecutable(script_ref, "/data/data/com.example.plasma.llvm/", "plasmaLLVM", 0)) {
           LOGE("Error! Cannot bccPrepareExecutable");
           return -1;
         }
      #endif // OLD_BCC
-	 
+
         native_function = (pPlasmaType)bccGetFuncAddr(script_ref, "fill_plasma");
         if (native_function == NULL) {
           LOGE("Error! Cannot find fill_plasma()");
@@ -493,7 +493,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_example_plasma_llvm_PlasmaView_native
           LOGI("LLVM Time JIT: %.2lf , Run: %.2lf, Avg: %.2lf, count=%d", start_run-start_jit, diff, time_sum / count, count+1);
       time_sum += diff + start_run - start_jit;
     } 
-    else 
+    else
 #endif // !__NOGDK__
 
     {

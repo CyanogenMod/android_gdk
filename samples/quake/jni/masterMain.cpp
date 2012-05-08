@@ -92,7 +92,7 @@ qquit(JNIEnv *env, jobject thiz) {
     return pAndroidQuit();
 }
 
-jboolean 
+jboolean
 gdk(JNIEnv *env, jobject obj)
 {
 #if !defined(__NOGDK__)
@@ -148,13 +148,13 @@ qcompile_bc(JNIEnv *env, jobject thiz, jbyteArray scriptRef, jint length)
     time = newtime;
 
     bccRegisterSymbolCallback(script_ref, lookupSymbol, NULL);
-   
+
  #ifdef OLD_BCC
     if (bccPrepareExecutable(script_ref, "/data/data/com.android.quake.llvm/quakeLLVM.oBCC", 0)) {
         LOGE("Error! Cannot bccPrepareExecutable");
         return JNI_FALSE;
     }
- #else  
+ #else
     if (bccPrepareExecutable(script_ref, "/data/data/com.android.quake.llvm/", "quakeLLVM", 0)) {
         LOGE("Error! Cannot bccPrepareExecutable");
         return JNI_FALSE;
@@ -227,15 +227,15 @@ qcompile_bc(JNIEnv *env, jobject thiz, jbyteArray scriptRef, jint length)
     }
     newtime = Sys_FloatTime ();
     double findptrtime = newtime - time;
-    
+
     LOGI("LLVM JIT time = %lf (%lf + %lf + %lf)\n", readtime+compiletime+findptrtime, 
-	   readtime, compiletime, findptrtime);
+           readtime, compiletime, findptrtime);
 
     return JNI_TRUE;
 #else
-   
+
     return JNI_FALSE;
-   
+
 #endif // !__GDK__ && !__NOGDK__
 }
 

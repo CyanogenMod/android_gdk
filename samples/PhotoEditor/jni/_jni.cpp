@@ -72,19 +72,19 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_android_photoeditor_filters_Image
     }
   #endif
     bccRegisterSymbolCallback(script_ref, lookupSymbol, NULL);
-   
+
   #ifdef OLD_BCC
     if (bccPrepareExecutable(script_ref, "/data/data/com.android.photoeditor/photoeditorLLVM.oBCC", 0)) {
         LOGE("Error! Cannot bccPrepareExecutable");
         return JNI_FALSE;
     }
-  #else 
+  #else
     if (bccPrepareExecutable(script_ref, "/data/data/com.android.photoeditor/", "photoeditorLLVM", 0)) {
         LOGE("Error! Cannot bccPrepareExecutable");
         return JNI_FALSE;
     }
   #endif // OLD_BCC
-   
+
     for(i=0; i<JNI_max; i++) {
         new_func_ptr[i] = bccGetFuncAddr(script_ref, JNIFunc[i].func_name);
         if (new_func_ptr[i] == NULL) {
@@ -106,7 +106,7 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_android_photoeditor_filters_Image
 
     return JNI_TRUE;
 #else
-   
+
     return JNI_FALSE;
 
 #endif // !__GDK__ && !__NOGDK__

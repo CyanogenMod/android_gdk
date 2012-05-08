@@ -33,9 +33,9 @@ include $(CLEAR_VARS)
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS := -Werror \
-	-I$(OUT)/../../../../frameworks/compile/libbcc/include \
-	-I$(OUT)/../../../../frameworks/native/include \
-	-I$(OUT)/../../../../system/core/include
+    -I$(OUT)/../../../../frameworks/compile/libbcc/include \
+    -I$(OUT)/../../../../frameworks/native/include \
+    -I$(OUT)/../../../../system/core/include
 
 LOCAL_C_INCLUDES := $(call include-path-for, wilhelm)
 
