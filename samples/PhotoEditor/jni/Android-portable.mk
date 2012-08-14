@@ -36,7 +36,6 @@ LOCAL_SRC_FILES := _jni.cpp \
 
 # This doesn't work on non-ARM yet.
 ifeq ($(TARGET_ARCH), arm)
-    LOCAL_NDK_VERSION := 5
     LOCAL_SDK_VERSION := 9
 endif
 
